@@ -51,6 +51,7 @@ Evaluate each candidate using these secondary-development rules:
 
 Selection rules:
 - keep at most `2` accepted tasks per repository
+- run candidate judgment through a subagent before the main agent accepts or rejects the candidate
 - reject bugfix-only, regression-only, docs/test-only, dependency-only, or pure refactor candidates
 - prefer candidates with clear file anchors inside one existing module and with evidence of capability expansion
 - if no candidate passes the minimum score, skip task generation for this repository
@@ -59,9 +60,13 @@ Selection rules:
 
 Rewrite accepted candidates with subagents:
 - subagent A extracts repository and source anchors
-- subagent B scores feasibility and filters
+- subagent B judges whether the candidate is true secondary development and filters
 - subagent C rewrites accepted candidates into benchmark-style task instructions
 - main agent verifies the rewritten output stays repo-grounded
+
+Prompt handling:
+- store reusable subagent prompts in `references/subagent_prompts.md`
+- prefer loading stored prompts over rewriting prompts inline during each run
 
 Rewrite outputs must retain:
 - source provenance

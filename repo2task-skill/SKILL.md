@@ -23,6 +23,8 @@ Hard rules:
 - if fewer than `2` candidates pass the secondary-development bar, output fewer tasks
 - do not backfill broad generic tasks when no acceptable PR/issue exists
 - persist fetched GitHub metadata locally before re-querying remote endpoints
+- candidate judgment should be delegated to subagents first; the main agent only consolidates and finalizes
+- reusable subagent prompts should be stored on disk and referenced instead of being rewritten ad hoc
 
 ## Mandatory Workflow (Step 1-6)
 
@@ -62,6 +64,7 @@ Accept candidates only when they satisfy all of these secondary-development rule
 
 Selection rules:
 - choose up to `2` candidates per repository
+- run the candidate judgment prompt with a subagent before the main agent accepts or rejects a candidate
 - reject PRs that are mainly bugfixes, regressions, typo/docs/test-only changes, dependency bumps, or pure refactors
 - prefer merged PRs whose changed files stay near one existing module and show capability expansion rather than repair
 - skip repository entirely if no candidate passes the minimum bar
@@ -70,7 +73,7 @@ Selection rules:
 
 Use subagents to rewrite accepted candidates into benchmark tasks:
 - subagent A: summarize the source PR/issue and extract anchors
-- subagent B: score feasibility and filter weak candidates
+- subagent B: judge whether the candidate is true secondary development and filter weak candidates
 - subagent C: rewrite accepted candidates into task instructions in the required bundle format
 - main agent: review, normalize, and finalize the rewritten task
 
@@ -197,6 +200,7 @@ This reference shows the preferred environment shape:
 
 - `references/workflow.md`
 - `references/task-schema.md`
+- `references/subagent_prompts.md`
 - `assets/instruction_template.md`
 - `assets/meta_info_template.md`
 - `assets/task_toml_template.toml`
