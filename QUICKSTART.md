@@ -3,10 +3,20 @@
 ## 1) 安装 Skill
 
 ```bash
-export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
-mkdir -p "$CODEX_HOME/skills"
-cp -R ./repo2task-skill "$CODEX_HOME/skills/repo2task"
+git clone https://github.com/StoKou/repo2task
+cd repo2task
+
+# OpenCode（推荐）
+mkdir -p ~/.config/opencode/skills
+cp -R ./repo2task-skill ~/.config/opencode/skills/repo2task
+
+# Claude Code（兼容）
+# mkdir -p ~/.claude/skills
+# cp -R ./repo2task-skill ~/.claude/skills/repo2task
 ```
+
+也可参考：
+- `/mnt/d/2026/skillsfolder/code/repo2skill/README_ZH.md` 的手动复制安装方式
 
 ## 2) 生成任务包
 

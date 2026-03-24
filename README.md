@@ -21,13 +21,25 @@
 
 ## ⚡ 快速开始
 
-一句话导入 skill：
+### 1) 下载仓库并安装 skill（手动复制）
 
 ```bash
-export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}" && mkdir -p "$CODEX_HOME/skills" && cp -R ./repo2task-skill "$CODEX_HOME/skills/repo2task"
+git clone https://github.com/StoKou/repo2task
+cd repo2task
+
+# OpenCode（推荐）
+mkdir -p ~/.config/opencode/skills
+cp -R ./repo2task-skill ~/.config/opencode/skills/repo2task
+
+# Claude Code（兼容）
+# mkdir -p ~/.claude/skills
+# cp -R ./repo2task-skill ~/.claude/skills/repo2task
 ```
 
-一句话使用 skill 解析 repo：
+安装方式可参考：
+- `/mnt/d/2026/skillsfolder/code/repo2skill/README_ZH.md`（手动复制安装）
+
+### 2) 在对话中使用 skill 解析仓库
 
 ```text
 请使用 repo2task skill，解析这个仓库并生成任务包：https://github.com/junegunn/fzf
