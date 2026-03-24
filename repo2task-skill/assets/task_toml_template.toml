@@ -2,11 +2,26 @@ version = "1.0"
 repo_url = ""
 repo_commit = ""
 
-role = ""
+source_type = ""
+source_id = ""
+source_url = ""
+source_title = ""
+source_state = ""
+source_merged_at = ""
+
 task_type = ""
 difficulty = ""
 entry_points = []
 expected_capability = ""
+anchor_files = []
+anchor_modules = []
+anchor_behavior = ""
+anchor_tests = []
+anchor_commit = ""
+rewrite_agent = ""
+rewrite_strategy = ""
+feasibility_score = 0.0
+filter_reasons = []
 
 # baseline behavior command from Step 1
 baseline_command = ""

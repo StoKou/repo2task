@@ -21,39 +21,67 @@ Required output fields:
 - input/output patterns
 - minimal runnable command
 
-## Step 2: Capability Abstraction
+## Step 2: GitHub Candidate Mining
 
-Build a capability map with these required fields:
-- core functionalities
-- key modules and responsibilities
-- interfaces (`CLI`, `API`, library)
-- existing workflows
-- extension points
-- replaceable components
+Mine and cache GitHub task candidates.
 
-## Step 3: Role-based Task Generation
+Accepted source priority:
+1. `merged PR`
+2. `issue with linked merged PR`
+3. `standalone high-quality issue`
 
-Generate at least 4 tasks and cover all required roles:
-- Product Engineer
-- Integration Engineer
-- Platform Engineer
-- QA Engineer
+Cache layout:
+- `cache/github/<owner>__<repo>/issues.json`
+- `cache/github/<owner>__<repo>/prs.json`
+- `cache/github/<owner>__<repo>/candidates.json`
 
-Constraints per task:
-- task is anchored to real repository files
-- task is feasible with incremental edits
-- entry points are explicit
-- expected capability is explicit and testable
+Required mined fields:
+- source ids, titles, URLs, states, timestamps
+- changed files
+- linked issue/PR relationships
+- merge or close metadata
+- candidate summary and raw source snippet references
 
-## Step 4: Modification Planning (Mandatory)
+## Step 3: Candidate Filtering And Scoring
+
+Evaluate each candidate using these gates:
+- specificity
+- file locality
+- testability
+- reproducibility
+- scope fit
+- independence from external services
+
+Selection rules:
+- keep at most `3` accepted tasks per repository
+- prefer candidates with clear file and behavior anchors
+- if no candidate passes the minimum score, skip task generation for this repository
+
+## Step 4: Subagent Rewrite
+
+Rewrite accepted candidates with subagents:
+- subagent A extracts repository and source anchors
+- subagent B scores feasibility and filters
+- subagent C rewrites accepted candidates into benchmark-style task instructions
+- main agent verifies the rewritten output stays repo-grounded
+
+Rewrite outputs must retain:
+- source provenance
+- changed-file anchors
+- observable behavior target
+- implementation feasibility at fixed commit
+
+## Step 5: Modification Planning (Mandatory)
 
 For each task, define:
+- source PR/issue summary
 - files to modify
 - functions/components to add or change
 - expected behavior delta
 - minimal-change justification
+- why the task remains implementable in this repository
 
-## Step 5: Task Packaging
+## Step 6: Task Packaging
 
 Each task must be isolated and reproducible:
 
@@ -70,3 +98,4 @@ Quality bar:
 - fixed commit hash only
 - deterministic tests
 - behavior-based assertions (avoid implementation coupling)
+- no synthetic fallback tasks when mined candidates are weak

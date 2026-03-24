@@ -21,7 +21,7 @@
 
 ## instruction.md
 
-用途：定义任务目标、约束和 Step 1-4 分析链路。
+用途：定义任务目标、约束和 PR/issue 到 benchmark task 的重写链路。
 
 必须包含：
 - Task Description
@@ -29,7 +29,11 @@
 - Expected Behavior
 - Constraints
 - Affected Modules/Files
-- Step 1-4 Analysis Summary
+- Original PR/issue summary
+- What was rewritten
+- What stayed anchored
+- Why task is implementable in this repo
+- Step 1-5 Analysis Summary
 
 ## task.toml
 
@@ -38,11 +42,22 @@
 必须包含：
 - `repo_url`
 - `repo_commit`（固定 commit hash）
-- `role`
+- `source_type`
+- `source_id`
+- `source_url`
+- `source_title`
+- `source_state`
 - `task_type`
 - `difficulty`
 - `entry_points`
 - `expected_capability`
+- `anchor_files`
+- `anchor_modules`
+- `anchor_behavior`
+- `anchor_tests`
+- `rewrite_agent`
+- `rewrite_strategy`
+- `feasibility_score`
 - 环境引用：`environment_dockerfile`、`environment_setup`
 - 测试引用：`phase1_test`、`phase2_test`
 

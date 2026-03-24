@@ -12,12 +12,18 @@
 - 不是只给建议，而是直接产出可跑的任务目录。
 - 让 AI 不止会解释仓库，更会推进仓库改造。
 
-`repo2task` 会解析仓库的 `examples/docs/README`，自动生成 benchmark 风格任务目录：
+`repo2task` 会先理解仓库文档与 examples，再优先挖掘 GitHub 上真实的 `PR/issue` 作为任务来源，并将通过筛选的候选重写成 benchmark 风格任务目录：
 - `instruction.md`（问题定义）
 - `task.toml`（任务元信息）
 - `environment/`（Docker 与配置）
 - `solution/`（解题脚本与说明）
 - `test/`（校验脚本）
+
+当前 skill 的核心约束：
+- 优先 `merged PR`，其次 `issue + linked merged PR`，最后才是高质量 standalone issue
+- 每个 GitHub 仓库最多生成 `3` 个任务
+- 如果没有足够好的候选，就少生成或跳过，不回填宽泛任务
+- 使用 subagent 对候选进行摘要、筛选和格式重写
 
 ## ⚡ 快速开始
 

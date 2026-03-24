@@ -2,12 +2,14 @@
 
 ## Task Description
 - Description:
-- Role:
+- Source type (`pr`, `issue`, `issue+pr`):
+- Source id / URL:
 - Task type:
 - Difficulty:
 
 ## Motivation
 - Why this task matters for repository evolution:
+- Why this source candidate is worth turning into a benchmark task:
 
 ## Expected Behavior
 - Observable behavior after implementation:
@@ -15,12 +17,15 @@
 
 ## Constraints
 - Must be grounded in existing repository capability.
+- Must stay anchored to the original PR/issue intent and changed-file neighborhood.
 - Must avoid full rewrite.
 - Must preserve baseline compatibility.
 - Must be testable via deterministic checks.
 
 ## Affected Modules/Files
 - Entry points:
+- Anchor files:
+- Anchor modules:
 - Files to modify:
 - Functions/components to add or change:
 
@@ -39,13 +44,23 @@
 - Extension points:
 - Replaceable components:
 
-## Step 3: Role-based Task Generation
+## Step 3: GitHub Candidate Summary
+- Original PR/issue summary:
+- Changed files from source:
+- Observable behavior implied by source:
+- Why this candidate passed filtering:
+
+## Step 4: Subagent Rewrite
+- Rewrite strategy:
+- What was rewritten:
+- What stayed anchored:
+- Why task is still implementable in this repo:
+
+## Step 5: Modification Planning (Mandatory)
 - Expected capability:
 - Task constraints:
-
-## Step 4: Modification Planning (Mandatory)
 - Expected behavior changes:
 - Minimal-change justification:
 
-## Step 1-4 Analysis Summary
+## Step 1-5 Analysis Summary
 - Summary:
