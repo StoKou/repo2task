@@ -24,7 +24,11 @@ anchor_commit = "<source-merge-or-anchor-commit>"
 rewrite_agent = "subagent-c"
 rewrite_strategy = "bounded-variant-from-pr"
 feasibility_score = 0.88
-filter_reasons = ["high-specificity", "clear-file-locality", "testable"]
+filter_reasons = [
+  "built-on-existing-module",
+  "clear-problem-statement",
+  "capability-extension-not-bugfix",
+]
 
 # environment setup references
 environment_dockerfile = "environment/Dockerfile"
@@ -42,6 +46,7 @@ Rules:
 - `source_*` fields must point to a real PR/issue.
 - `anchor_*` fields must keep the task grounded in repository files and behavior.
 - `rewrite_*` fields must explain how the accepted candidate was rewritten.
+- accepted candidates must satisfy all three filters: existing feature base, clear problem, and extra capability extension.
 
 ## Required `instruction.md` sections
 

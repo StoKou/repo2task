@@ -1,6 +1,6 @@
 ---
 name: repo2task
-description: "Convert GitHub repositories into executable benchmark task bundles by mining real PR/issue candidates, selecting up to 3 feasible tasks per repo, rewriting them with subagents, and packaging them reproducibly."
+description: "Convert GitHub repositories into executable benchmark task bundles by mining PR or issue candidates, keeping only high-quality secondary-development tasks, rewriting them with subagents, and packaging them reproducibly."
 ---
 
 # Repo2Task Skill
@@ -9,7 +9,7 @@ Use this skill when the user wants to transform one GitHub repository into execu
 
 ## Core Objective
 
-Generate up to 3 isolated tasks from one source repository. Every task must be runnable independently and include:
+Generate up to 2 isolated tasks from one source repository. Every task must be runnable independently and include:
 - `instruction.md`
 - `meta_info.md`
 - `task.toml`
@@ -19,8 +19,8 @@ Generate up to 3 isolated tasks from one source repository. Every task must be r
 
 Hard rules:
 - task source priority: `merged PR` > `issue with linked merged PR` > `high-quality standalone issue`
-- each repository outputs at most `3` accepted tasks
-- if fewer than `3` candidates pass quality gates, output fewer tasks
+- each repository outputs at most `2` accepted tasks
+- if fewer than `2` candidates pass the secondary-development bar, output fewer tasks
 - do not backfill broad generic tasks when no acceptable PR/issue exists
 - persist fetched GitHub metadata locally before re-querying remote endpoints
 
@@ -53,19 +53,17 @@ Collect for each PR/issue:
 - related commits / patch links when available
 - linked issue/PR relationships when available
 
-### Step 3: Candidate Filtering And Scoring
+### Step 3: Candidate Filtering
 
-Accept candidates only when they satisfy repository-grounded quality gates:
-- `specificity`
-- `file_locality`
-- `testability`
-- `reproducibility`
-- `scope_fit`
-- `independence_from_external_services`
+Accept candidates only when they satisfy all of these secondary-development rules:
+- they are built on top of an existing repository feature or module
+- they expose a clear product or engineering problem worth solving
+- they extend the existing feature with extra capability, compatibility, integration, or configurability
 
 Selection rules:
-- choose up to `3` candidates per repository
-- prefer merged PRs with clear changed-file anchors
+- choose up to `2` candidates per repository
+- reject PRs that are mainly bugfixes, regressions, typo/docs/test-only changes, dependency bumps, or pure refactors
+- prefer merged PRs whose changed files stay near one existing module and show capability expansion rather than repair
 - skip repository entirely if no candidate passes the minimum bar
 
 ### Step 4: Subagent Rewrite
@@ -79,6 +77,7 @@ Use subagents to rewrite accepted candidates into benchmark tasks:
 Rewrite constraints:
 - stay anchored to source changed files / nearby modules
 - keep the observable behavior aligned with the original PR/issue intent
+- keep the rewritten task framed as secondary development on an existing feature, not as a bugfix
 - allow bounded variation, but do not drift into unrelated capability invention
 - preserve repository implementability at the fixed commit
 

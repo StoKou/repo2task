@@ -42,19 +42,17 @@ Required mined fields:
 - merge or close metadata
 - candidate summary and raw source snippet references
 
-## Step 3: Candidate Filtering And Scoring
+## Step 3: Candidate Filtering
 
-Evaluate each candidate using these gates:
-- specificity
-- file locality
-- testability
-- reproducibility
-- scope fit
-- independence from external services
+Evaluate each candidate using these secondary-development rules:
+- the PR or issue must build on an existing repository feature or module
+- it must surface a clear problem or limitation in that existing feature
+- it must solve that problem by extending capability, compatibility, integration, configurability, or pluggability
 
 Selection rules:
-- keep at most `3` accepted tasks per repository
-- prefer candidates with clear file and behavior anchors
+- keep at most `2` accepted tasks per repository
+- reject bugfix-only, regression-only, docs/test-only, dependency-only, or pure refactor candidates
+- prefer candidates with clear file anchors inside one existing module and with evidence of capability expansion
 - if no candidate passes the minimum score, skip task generation for this repository
 
 ## Step 4: Subagent Rewrite

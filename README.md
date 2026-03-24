@@ -22,8 +22,9 @@
 
 当前 skill 的核心约束：
 - 优先 `merged PR`，其次 `issue + linked merged PR`，最后才是高质量 standalone issue
-- 每个 GitHub 仓库最多生成 `3` 个任务
-- 如果没有足够好的候选，就少生成或跳过，不回填宽泛任务
+- 每个 GitHub 仓库最多生成 `2` 个任务
+- 候选必须同时满足：基于现有功能、有明确问题、并且做了额外功能拓展
+- 如果没有足够好的候选，就少生成或跳过，不回填宽泛任务或 bugfix 任务
 - 使用 subagent 对候选进行摘要、筛选和格式重写
 - `environment/` 仅保留 `Dockerfile`，仓库导入和安装逻辑都写入镜像构建流程
 
