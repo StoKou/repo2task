@@ -4,6 +4,7 @@
 Output:
 <out>/<repo-name>/task_001_xxx/
   instruction.md
+  meta_info.md
   task.toml
   environment/
     Dockerfile
@@ -467,12 +468,8 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
         "",
         "## Task Description",
         f"- Description: Implement a `{t.task_type}` task grounded in repository entry points.",
-        f"- Role: `{t.role}`",
         f"- Task type: `{t.task_type}`",
         f"- Difficulty: `{t.difficulty}`",
-        "",
-        "## Motivation",
-        "- This task exercises practical secondary development while preserving the baseline workflow.",
         "",
         "## Expected Behavior",
         f"- Expected capability: {t.expected_capability}",
@@ -482,19 +479,30 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
         "## Constraints",
     ]
     lines.extend([f"- {x}" for x in t.constraints])
-    lines.extend([
+    lines.extend([""])
+    return "\n".join(lines)
+
+
+def render_meta_info(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: TaskPlan) -> str:
+    lines = [
+        f"# Meta Info: {t.task_id}",
+        "",
+        "## Source",
+        f"- Source type: derived benchmark task for `{t.role}`",
+        f"- Source id / URL: repository-level analysis from `{meta.repo_url}` at `{meta.repo_commit}`",
+        "- Original PR/issue summary: candidate source summary should be recorded here when PR/issue mining is enabled.",
+        "",
+        "## Motivation",
+        "- This task exercises practical secondary development while preserving the baseline workflow.",
+        "- The benchmark stays anchored to repository behavior rather than generic problem invention.",
         "",
         "## Affected Modules/Files",
         "- Entry points:",
-    ])
+    ]
     lines.extend([f"  - {x}" for x in t.entry_points])
-    lines.extend([
-        "- Files to modify:",
-    ])
+    lines.extend(["- Files to modify:"])
     lines.extend([f"  - {x}" for x in t.files_to_modify])
-    lines.extend([
-        "- Functions/components to add/change:",
-    ])
+    lines.extend(["- Functions/components to add/change:"])
     lines.extend([f"  - {x}" for x in t.functions_to_change])
     lines.extend([
         "",
@@ -522,18 +530,13 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
     lines.extend([f"  - {x}" for x in c.extension_points])
     lines.extend(["- Replaceable components:"])
     lines.extend([f"  - {x}" for x in c.replaceable_components])
-
     lines.extend([
         "",
-        "## Step 3: Role-based Task Generation",
-        f"- Role: `{t.role}`",
-        f"- Task type: `{t.task_type}`",
+        "## Step 3: Task Rewrite Notes",
         f"- Expected capability: {t.expected_capability}",
-        "- Constraints:",
-    ])
-    lines.extend([f"  - {x}" for x in t.constraints])
-
-    lines.extend([
+        "- What was rewritten: the solver-facing task text was compressed into `instruction.md`.",
+        "- What stayed anchored: entry points, behavior expectations, and file-local modification scope.",
+        "- Why task is implementable in this repo: task stays within existing modules and baseline workflow.",
         "",
         "## Step 4: Modification Planning (MANDATORY)",
         "- Expected behavior changes:",
@@ -542,14 +545,9 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
     lines.extend([
         f"- Minimal modification justification: {t.minimal_justification}",
         "",
-        "## Step 1-4 Analysis Summary",
+        "## Step 1-5 Analysis Summary",
         f"- Summary: `{meta.mode}` analysis identified capability focus on \"{(c.core_functions[0] if c.core_functions else 'core workflow')}\". "
         f"Task targets `{t.role}` outcomes through incremental edits on {', '.join(t.entry_points)} with behavior-safe validation.",
-        "",
-        "## Delivery Constraints",
-        "- Use fixed commit from task.toml",
-        "- Keep task independently executable and testable",
-        "- Tests must verify behavior, not implementation details",
         "",
     ])
     return "\n".join(lines)
@@ -765,6 +763,7 @@ def write_task_bundle(root: Path, meta: RepoMeta, understanding: Understanding, 
     task_dir = root / task.task_id
 
     write_file(task_dir / "instruction.md", render_instruction(meta, understanding, cap_map, task))
+    write_file(task_dir / "meta_info.md", render_meta_info(meta, understanding, cap_map, task))
     write_file(task_dir / "task.toml", render_task_toml(meta, task))
 
     write_file(task_dir / "environment" / "Dockerfile", render_dockerfile(meta))

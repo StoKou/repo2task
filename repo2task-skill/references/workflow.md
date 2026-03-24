@@ -88,6 +88,7 @@ Each task must be isolated and reproducible:
 ```text
 task_xxx/
 ├── instruction.md
+├── meta_info.md
 ├── task.toml
 ├── environment/
 │   └── Dockerfile

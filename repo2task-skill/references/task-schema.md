@@ -46,9 +46,16 @@ Rules:
 ## Required `instruction.md` sections
 
 - task description
-- motivation
 - expected behavior
 - constraints
+
+`instruction.md` rule:
+- keep only the problem statement, expected behavior, and solver-facing constraints
+- do not include motivation, source provenance, file anchors, or workflow analysis
+
+## Required `meta_info.md` sections
+
+- motivation
 - affected modules/files
 - original PR/issue summary
 - what was rewritten

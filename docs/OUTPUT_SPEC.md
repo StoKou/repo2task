@@ -5,6 +5,7 @@
 ```text
 <out>/<repo-slug>/task_xxx/
 ├── instruction.md
+├── meta_info.md
 ├── task.toml
 ├── environment/
 │   └── Dockerfile
@@ -20,13 +21,25 @@
 
 ## instruction.md
 
-用途：定义任务目标、约束和 PR/issue 到 benchmark task 的重写链路。
+用途：仅定义做题者需要看到的问题本身。
 
 必须包含：
 - Task Description
-- Motivation
 - Expected Behavior
 - Constraints
+
+不应包含：
+- 动机
+- 涉及文件
+- 原始 PR/issue 来源说明
+- 重写分析过程
+
+## meta_info.md
+
+用途：保存任务来源、动机、文件锚点和分析信息。
+
+必须包含：
+- Motivation
 - Affected Modules/Files
 - Original PR/issue summary
 - What was rewritten

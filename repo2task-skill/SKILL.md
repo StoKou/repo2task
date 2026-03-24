@@ -11,6 +11,7 @@ Use this skill when the user wants to transform one GitHub repository into execu
 
 Generate up to 3 isolated tasks from one source repository. Every task must be runnable independently and include:
 - `instruction.md`
+- `meta_info.md`
 - `task.toml`
 - `environment/`
 - `solution/`
@@ -98,6 +99,7 @@ Package each task as:
 ```text
 task_xxx/
 ├── instruction.md
+├── meta_info.md
 ├── task.toml
 ├── environment/
 │   └── Dockerfile
@@ -110,9 +112,14 @@ task_xxx/
 ### `instruction.md`
 Must include:
 - task description
-- motivation
 - expected behavior
 - constraints
+
+`instruction.md` should only contain the problem statement itself. Do not place source provenance, motivation, file anchors, or workflow analysis in this file.
+
+### `meta_info.md`
+Must include:
+- motivation
 - affected modules/files
 - original PR/issue summary
 - what was rewritten
@@ -192,4 +199,5 @@ This reference shows the preferred environment shape:
 - `references/workflow.md`
 - `references/task-schema.md`
 - `assets/instruction_template.md`
+- `assets/meta_info_template.md`
 - `assets/task_toml_template.toml`
