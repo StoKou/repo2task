@@ -1,11 +1,11 @@
 ---
 name: repo2task
-description: Clone/download a GitHub repository, analyze examples/docs/readme, and generate benchmark-style secondary-development tasks. Each requirement becomes one subtopic folder with instruction.md, task.toml, environment/, solution/, and test/.
+description: Parse a GitHub/local repository and generate benchmark-style secondary-development task bundles from examples/docs/readme.
 ---
 
 # Repo2Task Skill
 
-Use this skill to convert an existing GitHub repo into secondary-development tasks.
+Use this skill when the user asks to parse a repository and output secondary-development task bundles.
 
 ## Mandatory Pipeline
 
