@@ -1,20 +1,21 @@
 #!/usr/bin/env python3
-"""Generate benchmark-style secondary-development tasks from GitHub repositories.
+"""Generate repo2task benchmark bundles from a repository.
 
-Per subtopic output layout:
-<out>/<gitname>/<subtopic>/
+Output:
+<out>/<repo-name>/task_001_xxx/
   instruction.md
   task.toml
   environment/
     Dockerfile
-    skill_config.toml
-    io_config.json
+    setup.sh
   solution/
     solve.sh
     solution.md
+    behavior_contract.json
   test/
     test.sh
-    test_state.py
+    phase1_install_check.py
+    phase2_task_check.py
 """
 
 from __future__ import annotations
@@ -27,594 +28,724 @@ import tarfile
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Sequence, Tuple
+from typing import Dict, Iterable, List, Sequence, Tuple
 from urllib.request import urlretrieve
 
-MAX_CHARS_PER_FILE = 22000
-MAX_TOPICS = 6
+MAX_DOC_BYTES = 20000
+MAX_TOPICS = 8
+
+ROLE_SPECS = [
+    ("Product Engineer", "new_feature", "medium"),
+    ("Integration Engineer", "workflow_integration", "medium"),
+    ("Platform Engineer", "modularization_or_replacement", "hard"),
+    ("QA Engineer", "robustness_and_edge_cases", "medium"),
+]
 
 
 @dataclass
 class RepoMeta:
-    name: str
+    repo_input: str
+    repo_url: str
+    repo_commit: str
+    repo_name: str
+    mode: str
     category: str = "secondary-development"
     language: str = "unknown"
 
 
 @dataclass
-class TopicPlan:
-    index: int
-    slug: str
+class Understanding:
+    purpose: str
+    use_cases: List[str]
+    input_output: str
+    minimal_usage: str
+
+
+@dataclass
+class CapabilityMap:
+    core_functions: List[str]
+    key_modules: List[str]
+    interfaces: List[str]
+    workflows: List[str]
+    extension_points: List[str]
+    replaceable_components: List[str]
+
+
+@dataclass
+class TaskPlan:
+    task_id: str
+    role: str
+    task_type: str
+    difficulty: str
     title: str
-    dev_mode: str
-    concept: str
-    requirement: str
-    implementation: List[str]
-    acceptance: List[str]
-    risks: List[str]
+    entry_points: List[str]
+    expected_capability: str
+    constraints: List[str]
+    files_to_modify: List[str]
+    functions_to_change: List[str]
+    behavior_changes: List[str]
+    minimal_justification: str
+    baseline_command: str
 
 
-def run(cmd: Sequence[str], cwd: Path | None = None) -> None:
-    subprocess.run(cmd, cwd=str(cwd) if cwd else None, check=True)
+def run(cmd: Sequence[str], cwd: Path | None = None) -> str:
+    proc = subprocess.run(
+        cmd,
+        cwd=str(cwd) if cwd else None,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return proc.stdout.strip()
 
 
-def sanitize_slug(text: str) -> str:
-    text = text.lower().strip()
-    text = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", text)
-    text = re.sub(r"-+", "-", text).strip("-")
-    return text or "subtopic"
-
-
-def normalize_repo_dirname(repo_name: str) -> str:
-    return sanitize_slug(repo_name.replace("/", "-"))
+def slug(s: str) -> str:
+    s = s.lower().strip()
+    s = re.sub(r"[^a-z0-9\u4e00-\u9fff]+", "-", s)
+    s = re.sub(r"-+", "-", s).strip("-")
+    return s or "task"
 
 
 def repo_url_from_name(name: str) -> str:
     return f"https://github.com/{name}.git"
 
 
-def _extract_github_name(repo_arg: str) -> str | None:
-    if repo_arg.startswith(("http://", "https://", "git@")):
-        m = re.search(r"github\.com[:/]+([^/]+/[^/.]+)", repo_arg)
-        return m.group(1) if m else None
-    if "/" in repo_arg and not repo_arg.startswith("."):
+def extract_owner_repo(repo_arg: str) -> str | None:
+    if re.match(r"^[^/\s]+/[^/\s]+$", repo_arg):
         return repo_arg
-    return None
+    m = re.search(r"github\.com[:/]+([^/]+/[^/.]+)", repo_arg)
+    return m.group(1) if m else None
 
 
-def _download_github_archive(repo_name: str, target: Path) -> bool:
-    owner, repo = repo_name.split("/", 1)
-    tmp = target.parent / "archive_tmp"
+def remote_head_commit(remote_url: str) -> str | None:
+    try:
+        out = run(["git", "ls-remote", remote_url, "HEAD"])
+    except Exception:
+        return None
+    if not out:
+        return None
+    return out.split()[0]
+
+
+def download_archive(owner_repo: str, dest: Path) -> bool:
+    owner, repo = owner_repo.split("/", 1)
+    tmp = dest.parent / "archive_tmp"
     tmp.mkdir(parents=True, exist_ok=True)
-
     for branch in ("main", "master"):
-        archive = tmp / f"{repo}-{branch}.tar.gz"
+        tar = tmp / f"{repo}-{branch}.tar.gz"
         url = f"https://codeload.github.com/{owner}/{repo}/tar.gz/refs/heads/{branch}"
         try:
-            urlretrieve(url, archive)
-            if not archive.exists() or archive.stat().st_size == 0:
-                continue
-            with tarfile.open(archive, "r:gz") as tf:
+            urlretrieve(url, tar)
+            with tarfile.open(tar, "r:gz") as tf:
                 tf.extractall(tmp)
-            candidates = sorted(p for p in tmp.iterdir() if p.is_dir() and p.name.startswith(f"{repo}-"))
-            if not candidates:
+            extracted = sorted(p for p in tmp.iterdir() if p.is_dir() and p.name.startswith(f"{repo}-"))
+            if not extracted:
                 continue
-            extracted = candidates[-1]
-            extracted.rename(target)
+            extracted[-1].rename(dest)
             return True
         except Exception:
             continue
     return False
 
 
-def resolve_repo(repo_arg: str) -> Tuple[Path, tempfile.TemporaryDirectory | None]:
+def resolve_repo(repo_arg: str) -> Tuple[Path, tempfile.TemporaryDirectory | None, str, str]:
+    """Return path, tempdir, repo_url, repo_commit."""
     p = Path(repo_arg).expanduser()
     if p.exists() and p.is_dir():
-        return p.resolve(), None
+        repo_url = run(["git", "config", "--get", "remote.origin.url"], cwd=p) if (p / ".git").exists() else str(p.resolve())
+        repo_commit = run(["git", "rev-parse", "HEAD"], cwd=p) if (p / ".git").exists() else "UNKNOWN_LOCAL_COMMIT"
+        return p.resolve(), None, repo_url, repo_commit
 
-    if repo_arg.startswith(("http://", "https://", "git@")):
+    owner_repo = extract_owner_repo(repo_arg)
+    if owner_repo:
+        remote_url = repo_url_from_name(owner_repo)
+    else:
+        remote_url = repo_arg
+
+    if remote_url.startswith(("http://", "https://", "git@")):
+        head_commit = remote_head_commit(remote_url)
         tmp = tempfile.TemporaryDirectory(prefix="repo2task_")
         target = Path(tmp.name) / "source"
         try:
-            run(["git", "clone", "--depth", "1", repo_arg, str(target)])
-            return target, tmp
-        except subprocess.CalledProcessError:
-            repo_name = _extract_github_name(repo_arg)
-            if repo_name and _download_github_archive(repo_name, target):
-                return target, tmp
+            subprocess.run(["git", "clone", "--depth", "1", remote_url, str(target)], check=True)
+            commit = run(["git", "rev-parse", "HEAD"], cwd=target)
+            return target, tmp, remote_url, commit
+        except Exception:
+            owner_repo_fallback = extract_owner_repo(remote_url)
+            if owner_repo_fallback and download_archive(owner_repo_fallback, target):
+                if not head_commit:
+                    raise RuntimeError("Cannot determine fixed commit hash for archived repository")
+                return target, tmp, remote_url, head_commit
             raise
-
-    if "/" in repo_arg and not repo_arg.startswith("."):
-        return resolve_repo(repo_url_from_name(repo_arg))
 
     raise FileNotFoundError(f"Repository not found: {repo_arg}")
 
 
-def load_repo_meta_from_json(json_path: Path, index: int) -> RepoMeta:
-    items = json.loads(json_path.read_text(encoding="utf-8"))
-    if not isinstance(items, list) or not items:
-        raise ValueError("repos.json is empty or invalid")
-    if index < 0 or index >= len(items):
-        raise IndexError(f"index {index} is out of range (0..{len(items)-1})")
-    item = items[index]
+def load_repos_json(path: Path, index: int) -> Dict[str, str]:
+    data = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(data, list) or not data:
+        raise ValueError("Invalid repos json")
+    item = data[index]
     if not isinstance(item, dict) or "name" not in item:
-        raise ValueError("selected item has no 'name' field")
-    return RepoMeta(
-        name=str(item["name"]).strip(),
-        category=str(item.get("category", "secondary-development")),
-        language=str(item.get("language", "unknown")),
-    )
+        raise ValueError("Missing 'name' in repos json item")
+    return {
+        "name": str(item["name"]),
+        "category": str(item.get("category", "secondary-development")),
+        "language": str(item.get("language", "unknown")),
+    }
 
 
-def candidate_files(repo: Path) -> List[Path]:
-    picks: List[Path] = []
-
+def docs_files(repo: Path) -> List[Path]:
+    files: List[Path] = []
     for d in ("examples", "example", "docs", "doc"):
         base = repo / d
         if base.exists():
             for ext in ("*.md", "*.rst", "*.txt"):
-                picks.extend(sorted(base.rglob(ext)))
-
+                files.extend(sorted(base.rglob(ext)))
     for readme in ("README.md", "README.MD", "readme.md"):
         f = repo / readme
         if f.exists():
-            picks.append(f)
-
-    uniq: List[Path] = []
+            files.append(f)
     seen = set()
-    for f in picks:
-        key = str(f.resolve())
-        if key not in seen and f.is_file():
-            uniq.append(f)
-            seen.add(key)
-    return uniq
-
-
-def load_text(files: Iterable[Path]) -> str:
-    blocks: List[str] = []
-    for fp in files:
-        try:
-            txt = fp.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
-        blocks.append(f"\n\nSOURCE_FILE: {fp}\n{txt[:MAX_CHARS_PER_FILE]}")
-    return "\n".join(blocks)
-
-
-def _header_candidates(blob: str) -> List[Tuple[int, str]]:
-    out: List[Tuple[int, str]] = []
-    for line in blob.splitlines():
-        m = re.match(r"^(#{1,6})\s+(.+?)\s*$", line)
-        if not m:
-            continue
-        level = len(m.group(1))
-        title = re.sub(r"[`*_]", "", m.group(2)).strip()
-        out.append((level, title))
+    out: List[Path] = []
+    for f in files:
+        k = str(f.resolve())
+        if k not in seen:
+            seen.add(k)
+            out.append(f)
     return out
 
 
-def extract_topics(blob: str) -> List[str]:
-    scored: List[Tuple[int, str]] = []
-
-    include_kw = [
-        "feature",
-        "usage",
-        "use",
-        "integration",
-        "plugin",
-        "api",
-        "advanced",
-        "performance",
-        "key binding",
-        "completion",
-        "search",
-        "query",
-        "workflow",
-        "custom",
-        "extension",
+def source_files(repo: Path) -> List[Path]:
+    exts = [
+        "*.py", "*.js", "*.ts", "*.go", "*.rs", "*.java", "*.c", "*.cpp", "*.sh", "*.rb", "*.php"
     ]
-    exclude_kw = [
-        "installation",
-        "install",
-        "homebrew",
-        "linux package",
-        "windows package",
-        "binary release",
-        "license",
-        "contributing",
-        "table of contents",
+    out: List[Path] = []
+    for ext in exts:
+        out.extend(sorted(repo.rglob(ext)))
+    filtered = []
+    for f in out:
+        rel = str(f.relative_to(repo))
+        if rel.startswith(".git/") or "/.git/" in rel:
+            continue
+        if "node_modules/" in rel or "/dist/" in rel or "/build/" in rel:
+            continue
+        filtered.append(f)
+    return filtered[:500]
+
+
+def read_text(path: Path, max_bytes: int = MAX_DOC_BYTES) -> str:
+    try:
+        return path.read_text(encoding="utf-8", errors="ignore")[:max_bytes]
+    except OSError:
+        return ""
+
+
+def infer_repo_type(repo: Path) -> str:
+    if (repo / "package.json").exists():
+        return "javascript_or_typescript_project"
+    if (repo / "pyproject.toml").exists() or (repo / "setup.py").exists() or (repo / "requirements.txt").exists():
+        return "python_project"
+    if (repo / "go.mod").exists():
+        return "go_project"
+    if (repo / "Cargo.toml").exists():
+        return "rust_project"
+    if (repo / "Dockerfile").exists():
+        return "service_or_tooling_project"
+    return "generic_source_repository"
+
+
+def detect_mode(doc_paths: List[Path]) -> str:
+    return "documentation-driven" if doc_paths else "code-driven"
+
+
+def extract_minimal_usage_from_docs(doc_paths: List[Path]) -> str:
+    for p in doc_paths:
+        text = read_text(p)
+        block = re.search(r"```(?:bash|sh)?\n(.*?)\n```", text, flags=re.S)
+        if block:
+            cmd_lines = [x.strip() for x in block.group(1).strip().splitlines() if x.strip()]
+            for line in cmd_lines:
+                if line.startswith("#"):
+                    continue
+                if "<" in line or ">" in line:
+                    continue
+                return line
+    return ""
+
+
+def fallback_minimal_usage_from_code(repo: Path) -> str:
+    if (repo / "package.json").exists():
+        return "npm install && npm test"
+    if (repo / "pyproject.toml").exists() or (repo / "requirements.txt").exists():
+        return "python3 -m pip install -r requirements.txt && pytest -q"
+    if (repo / "go.mod").exists():
+        return "go test ./..."
+    if (repo / "Cargo.toml").exists():
+        return "cargo test"
+    return "ls -la"
+
+
+def build_understanding(repo: Path, doc_paths: List[Path], mode: str) -> Understanding:
+    if mode == "documentation-driven":
+        merged = "\n\n".join(read_text(p) for p in doc_paths[:6])
+        purpose = "Repository capabilities inferred from README/docs/examples."
+        h2 = re.findall(r"^##\s+(.+)$", merged, flags=re.M)
+        use_cases = h2[:4] if h2 else ["Follow documented usage patterns", "Extend existing workflows"]
+        io = "Input/output inferred from usage snippets and documented examples."
+        minimal = extract_minimal_usage_from_docs(doc_paths) or fallback_minimal_usage_from_code(repo)
+        return Understanding(purpose=purpose, use_cases=use_cases, input_output=io, minimal_usage=minimal)
+
+    repo_type = infer_repo_type(repo)
+    src = source_files(repo)
+    entry_candidates = [str(p.relative_to(repo)) for p in src[:6]]
+    purpose = f"No sufficient docs found; inferred from code structure ({repo_type})."
+    use_cases = [
+        "Run baseline workflow from inferred entry points",
+        "Add secondary development features without rewriting core modules",
+    ]
+    io = f"Input/output inferred from file layout and entry candidates: {', '.join(entry_candidates[:3]) or 'N/A'}."
+    minimal = fallback_minimal_usage_from_code(repo)
+    return Understanding(purpose=purpose, use_cases=use_cases, input_output=io, minimal_usage=minimal)
+
+
+def build_capability_map(repo: Path, doc_paths: List[Path], mode: str) -> CapabilityMap:
+    src = source_files(repo)
+    rel = [str(p.relative_to(repo)) for p in src]
+
+    core = []
+    if mode == "documentation-driven":
+        merged = "\n\n".join(read_text(p) for p in doc_paths[:6])
+        headers = re.findall(r"^#{1,3}\s+(.+)$", merged, flags=re.M)
+        for h in headers:
+            h = re.sub(r"[`*_]", "", h).strip()
+            if 4 <= len(h) <= 80:
+                core.append(h)
+        if not core:
+            core = ["Documented core workflow", "CLI/API usage"]
+    else:
+        core = ["Code-inferred core workflow", "Entry-point driven execution"]
+
+    key_modules = rel[:8] if rel else ["README.md"]
+    interfaces = []
+    if any("cli" in r.lower() or "cmd/" in r for r in rel):
+        interfaces.append("CLI")
+    if any("api" in r.lower() or "server" in r.lower() for r in rel):
+        interfaces.append("Service/API")
+    if not interfaces:
+        interfaces.append("Library/Module Interface")
+
+    workflows = [
+        "baseline setup and run",
+        "feature extension on existing modules",
+        "regression-safe verification",
     ]
 
-    for level, title in _header_candidates(blob):
-        lower = title.lower()
-        if len(title) < 4 or len(title) > 80:
-            continue
+    extension_points = key_modules[:4]
+    replaceable = key_modules[4:8] if len(key_modules) > 4 else key_modules[:2]
 
-        score = 0
-        if level <= 2:
-            score += 2
-        if any(k in lower for k in include_kw):
-            score += 4
-        if any(k in lower for k in exclude_kw):
-            score -= 4
-        if re.search(r"\b(api|cli|plugin|performance|workflow|search)\b", lower):
-            score += 3
-
-        scored.append((score, title))
-
-    scored.sort(key=lambda x: x[0], reverse=True)
-
-    topics: List[str] = []
-    seen = set()
-    for score, title in scored:
-        if score < 1:
-            continue
-        key = title.lower()
-        if key in seen:
-            continue
-        seen.add(key)
-        topics.append(title)
-        if len(topics) >= MAX_TOPICS:
-            break
-
-    if not topics:
-        fallback = ["核心检索流程", "交互式命令行能力", "扩展与集成能力"]
-        return fallback[:MAX_TOPICS]
-
-    return topics
+    return CapabilityMap(
+        core_functions=core[:MAX_TOPICS],
+        key_modules=key_modules,
+        interfaces=interfaces,
+        workflows=workflows,
+        extension_points=extension_points,
+        replaceable_components=replaceable,
+    )
 
 
-def build_plans(topics: List[str], repo_name: str) -> List[TopicPlan]:
-    modes = ["新增功能", "依赖替换（掉包）", "功能聚合"]
-    plans: List[TopicPlan] = []
+def choose_entry_points(cap_map: CapabilityMap, idx: int) -> List[str]:
+    base = cap_map.key_modules
+    if not base:
+        return ["README.md"]
+    start = (idx * 2) % len(base)
+    picked = base[start:start + 2]
+    return picked if picked else [base[0]]
 
-    for i, topic in enumerate(topics, start=1):
-        mode = modes[(i - 1) % len(modes)]
-        slug = f"{i:02d}-{sanitize_slug(topic)}"
 
-        concept = (
-            f"{topic} 是 {repo_name} 的关键能力点。需要先识别该能力的输入契约、状态流转和依赖关系，"
-            f"再进行二次开发，避免对现有用户行为造成隐式破坏。"
-        )
-        requirement = (
-            f"围绕 {topic} 设计 {mode} 方案：要求具备可落地的模块边界、兼容策略、回滚路径与观测指标，"
-            f"并对关键行为给出可执行测试。"
-        )
+def make_task_plans(meta: RepoMeta, understanding: Understanding, cap_map: CapabilityMap) -> List[TaskPlan]:
+    plans: List[TaskPlan] = []
+    capability_hint = cap_map.core_functions[0] if cap_map.core_functions else "core workflow"
 
-        implementation = [
-            "梳理当前模块与调用链，明确可替换点与必须兼容的接口。",
-            "按 domain/service/adapter 拆分实现，支持新旧方案并存切换。",
-            "为核心路径新增日志、指标和错误分类，确保故障可定位。",
-            "补齐迁移说明（启用、回滚、兼容性）并提供命令行验证示例。",
+    for i, (role, task_type, difficulty) in enumerate(ROLE_SPECS, start=1):
+        task_id = f"task_{i:03d}"
+        entry = choose_entry_points(cap_map, i - 1)
+        title = f"{role}: Extend {capability_hint}"
+        expected_capability = f"Deliver {task_type} on top of existing repository capability without full rewrite"
+
+        constraints = [
+            "Ground changes in existing modules and workflows",
+            "Keep baseline behavior backward-compatible",
+            "Do not rewrite the entire repository",
+            "Use fixed commit as starting point",
         ]
-        acceptance = [
-            "默认行为对现有用户保持兼容，或在文档中明确列出不兼容项。",
-            "至少覆盖主路径、异常路径、边界条件三类自动化测试。",
-            "能通过任务内 `test/test.sh` 完成验证并给出明确结果。",
+        files_to_modify = entry + [f"repo2task_artifacts/{task_id}/capability.md"]
+        functions_to_change = [
+            f"add_or_update_{slug(task_type)}_entry",
+            f"validate_{slug(role)}_behavior",
         ]
-        risks = [
-            "依赖替换时行为细节变化导致回归。",
-            "缺乏观测信息导致线上问题排障困难。",
-            "回滚步骤不完整导致发布风险放大。",
+        behavior_changes = [
+            "New capability path should be callable via documented workflow",
+            "Baseline workflow should still succeed (no regression)",
         ]
+        justification = "Changes are constrained to existing entry points plus one isolated artifact path to minimize risk."
 
         plans.append(
-            TopicPlan(
-                index=i,
-                slug=slug,
-                title=topic,
-                dev_mode=mode,
-                concept=concept,
-                requirement=requirement,
-                implementation=implementation,
-                acceptance=acceptance,
-                risks=risks,
+            TaskPlan(
+                task_id=task_id,
+                role=role,
+                task_type=task_type,
+                difficulty=difficulty,
+                title=title,
+                entry_points=entry,
+                expected_capability=expected_capability,
+                constraints=constraints,
+                files_to_modify=files_to_modify,
+                functions_to_change=functions_to_change,
+                behavior_changes=behavior_changes,
+                minimal_justification=justification,
+                baseline_command=understanding.minimal_usage,
             )
         )
-
     return plans
 
 
-def render_instruction(plan: TopicPlan, repo: RepoMeta) -> str:
+def toml_list(items: Iterable[str]) -> str:
+    return "[" + ", ".join(json.dumps(x) for x in items) + "]"
+
+
+def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: TaskPlan) -> str:
     lines = [
-        f"# 问题: {plan.title} 二次开发", "", "## 背景", plan.concept, "", "## 目标", plan.requirement, "",
-        "## 开发要求",
+        f"# {t.task_id}: {t.title}",
+        "",
+        "## Step 1: Quickstart Understanding",
+        f"- Understanding mode: `{meta.mode}`",
+        f"- Repository purpose: {u.purpose}",
+        "- Target use cases:",
     ]
-    lines.extend([f"- {x}" for x in plan.implementation])
-    lines.extend(["", "## 验收标准"])
-    lines.extend([f"- {x}" for x in plan.acceptance])
-    lines.extend(["", "## 风险与约束"])
-    lines.extend([f"- {x}" for x in plan.risks])
-    lines.extend(
-        [
-            "",
-            "## 上下文",
-            f"- 仓库: `{repo.name}`",
-            f"- 类型: `{repo.category}`",
-            f"- 语言: `{repo.language}`",
-            f"- 开发模式: `{plan.dev_mode}`",
-            "",
-        ]
-    )
+    lines.extend([f"  - {x}" for x in u.use_cases])
+    lines.extend([
+        f"- Input/output format: {u.input_output}",
+        f"- Minimal usage pattern: `{u.minimal_usage}`",
+        "",
+        "## Step 2: Capability Abstraction",
+        "- Core functionalities:",
+    ])
+    lines.extend([f"  - {x}" for x in c.core_functions[:6]])
+    lines.extend(["- Key modules and roles:"])
+    lines.extend([f"  - {x}" for x in c.key_modules[:8]])
+    lines.extend(["- Interfaces:"])
+    lines.extend([f"  - {x}" for x in c.interfaces])
+    lines.extend(["- Existing workflows:"])
+    lines.extend([f"  - {x}" for x in c.workflows])
+    lines.extend(["- Extension points:"])
+    lines.extend([f"  - {x}" for x in c.extension_points])
+    lines.extend(["- Replaceable components:"])
+    lines.extend([f"  - {x}" for x in c.replaceable_components])
+
+    lines.extend([
+        "",
+        "## Step 3: Role-based Task Generation",
+        f"- Role: `{t.role}`",
+        f"- Task type: `{t.task_type}`",
+        f"- Expected capability: {t.expected_capability}",
+        "- Constraints:",
+    ])
+    lines.extend([f"  - {x}" for x in t.constraints])
+
+    lines.extend([
+        "",
+        "## Step 4: Modification Planning (MANDATORY)",
+        "- Files to modify:",
+    ])
+    lines.extend([f"  - {x}" for x in t.files_to_modify])
+    lines.extend(["- Functions/components to add/change:"])
+    lines.extend([f"  - {x}" for x in t.functions_to_change])
+    lines.extend(["- Expected behavior changes:"])
+    lines.extend([f"  - {x}" for x in t.behavior_changes])
+    lines.extend([
+        f"- Minimal modification justification: {t.minimal_justification}",
+        "",
+        "## Delivery Constraints",
+        "- Use fixed commit from task.toml",
+        "- Keep task independently executable and testable",
+        "- Tests must verify behavior, not implementation details",
+        "",
+    ])
     return "\n".join(lines)
 
 
-def render_task_toml(plan: TopicPlan, repo: RepoMeta) -> str:
-    tags = [
-        "secondary-dev",
-        sanitize_slug(plan.dev_mode),
-        sanitize_slug(repo.language),
-        sanitize_slug(repo.category),
-    ]
-    tags_str = ", ".join(f'"{t}"' for t in tags)
-    return "\n".join(
-        [
-            'version = "1.0"',
-            "",
-            "[metadata]",
-            f'author_name = "repo2task"',
-            f'author_email = "noreply@example.com"',
-            'difficulty = "medium"',
-            'category = "programming"',
-            f"tags = [{tags_str}]",
-            f'repo = "{repo.name}"',
-            f'subtopic = "{plan.slug}"',
-            f'dev_mode = "{plan.dev_mode}"',
-            "",
-            "[verifier]",
-            "timeout_sec = 600.0",
-            "",
-            "[agent]",
-            "timeout_sec = 900.0",
-            "",
-            "[environment]",
-            "build_timeout_sec = 1200.0",
-            "cpus = 2",
-            'memory = "4G"',
-            'storage = "20G"',
-            "",
-        ]
-    )
+def render_task_toml(meta: RepoMeta, t: TaskPlan) -> str:
+    return "\n".join([
+        'version = "1.0"',
+        f'repo_url = {json.dumps(meta.repo_url)}',
+        f'repo_commit = {json.dumps(meta.repo_commit)}',
+        f'category = {json.dumps(meta.category)}',
+        f'language = {json.dumps(meta.language)}',
+        f'role = {json.dumps(t.role)}',
+        f'task_type = {json.dumps(t.task_type)}',
+        f'difficulty = {json.dumps(t.difficulty)}',
+        f'entry_points = {toml_list(t.entry_points)}',
+        f'expected_capability = {json.dumps(t.expected_capability)}',
+        f'baseline_command = {json.dumps(t.baseline_command)}',
+        'environment_dockerfile = "environment/Dockerfile"',
+        'environment_setup = "environment/setup.sh"',
+        'phase1_test = "test/phase1_install_check.py"',
+        'phase2_test = "test/phase2_task_check.py"',
+        'behavior_contract = "solution/behavior_contract.json"',
+        "",
+    ])
 
 
 def render_dockerfile() -> str:
-    return "\n".join(
-        [
-            "FROM ubuntu:24.04",
-            "",
-            "WORKDIR /app",
-            "",
-            "RUN apt-get update && apt-get install -y \\",
-            "    bash \\",
-            "    ca-certificates \\",
-            "    curl \\",
-            "    git \\",
-            "    python3 \\",
-            "    python3-pip \\",
-            "    && rm -rf /var/lib/apt/lists/*",
-            "",
-        ]
-    )
-
-
-def render_skill_config(repo: RepoMeta, plan: TopicPlan) -> str:
-    return "\n".join(
-        [
-            '[skill]',
-            'name = "repo2task"',
-            f'repo = "{repo.name}"',
-            f'subtopic = "{plan.slug}"',
-            f'dev_mode = "{plan.dev_mode}"',
-            "",
-            '[io]',
-            'input_dir = "/app/input"',
-            'output_dir = "/app/output"',
-            'workspace = "/app"',
-            "",
-        ]
-    )
-
-
-def render_io_config(repo: RepoMeta, plan: TopicPlan) -> str:
-    return json.dumps(
-        {
-            "repo": repo.name,
-            "subtopic": plan.slug,
-            "expected_inputs": [
-                "source repository",
-                "docs/examples/readme context",
-                "existing module contracts",
-            ],
-            "expected_outputs": [
-                "code changes",
-                "updated docs",
-                "passing tests",
-            ],
-        },
-        ensure_ascii=False,
-        indent=2,
-    ) + "\n"
-
-
-def render_solution_sh(plan: TopicPlan) -> str:
-    return "\n".join(
-        [
-            "#!/usr/bin/env bash",
-            "set -euo pipefail",
-            "",
-            f'echo "[repo2task] Solving subtopic: {plan.slug}"',
-            "",
-            "# 1) Implement required code changes in target modules.",
-            "# 2) Update docs for compatibility and rollback.",
-            "# 3) Run tests and fix regressions.",
-            "",
-            "# Example placeholders (replace with real project commands):",
-            "# git diff -- .",
-            "# pytest -q",
-            "",
-            "echo \"done\"",
-            "",
-        ]
-    )
-
-
-def render_solution_md(plan: TopicPlan, repo: RepoMeta) -> str:
-    lines = [
-        f"# Solution Notes: {plan.slug}",
+    return "\n".join([
+        "FROM ubuntu:24.04",
         "",
-        "## Recommended Execution Steps",
-        "1. Locate the current module boundary and public contract.",
-        "2. Implement the selected secondary-development mode incrementally.",
-        "3. Keep migration and rollback instructions synchronized with code.",
-        "4. Run `test/test.sh` and ensure all checks pass.",
+        "WORKDIR /workspace",
         "",
-        "## Suggested Change Scope",
-        "- Core module adaptation",
-        "- Adapter replacement or aggregation layer",
-        "- Observability and error handling",
-        "- Documentation updates",
+        "RUN apt-get update && apt-get install -y \\",
+        "  bash ca-certificates curl git python3 python3-pip \\",
+        "  && rm -rf /var/lib/apt/lists/*",
         "",
-        "## Context",
-        f"- Repo: `{repo.name}`",
-        f"- Subtopic: `{plan.slug}`",
-        f"- Mode: `{plan.dev_mode}`",
+    ])
+
+
+def render_setup_sh(meta: RepoMeta) -> str:
+    return "\n".join([
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
         "",
-    ]
-    return "\n".join(lines)
+        "ROOT=\"$(cd \"$(dirname \"$0\")/..\" && pwd)\"",
+        "REPO_DIR=\"$ROOT/repo\"",
+        f"REPO_URL={json.dumps(meta.repo_url)}",
+        f"REPO_COMMIT={json.dumps(meta.repo_commit)}",
+        "",
+        "mkdir -p \"$REPO_DIR\"",
+        "if [ ! -d \"$REPO_DIR/.git\" ]; then",
+        "  git clone \"$REPO_URL\" \"$REPO_DIR\"",
+        "fi",
+        "git -C \"$REPO_DIR\" fetch --all --tags || true",
+        "git -C \"$REPO_DIR\" checkout \"$REPO_COMMIT\"",
+        "",
+        "# Heuristic dependency setup",
+        "if [ -f \"$REPO_DIR/requirements.txt\" ]; then",
+        "  python3 -m pip install -r \"$REPO_DIR/requirements.txt\" || true",
+        "fi",
+        "if [ -f \"$REPO_DIR/pyproject.toml\" ]; then",
+        "  python3 -m pip install -e \"$REPO_DIR\" || true",
+        "fi",
+        "if [ -f \"$REPO_DIR/package.json\" ]; then",
+        "  (cd \"$REPO_DIR\" && npm install) || true",
+        "fi",
+        "if [ -f \"$REPO_DIR/go.mod\" ]; then",
+        "  (cd \"$REPO_DIR\" && go mod download) || true",
+        "fi",
+        "if [ -f \"$REPO_DIR/Cargo.toml\" ]; then",
+        "  (cd \"$REPO_DIR\" && cargo fetch) || true",
+        "fi",
+        "",
+        "echo \"setup complete\"",
+        "",
+    ])
+
+
+def render_behavior_contract(t: TaskPlan) -> str:
+    payload = {
+        "task_id": t.task_id,
+        "expected_capability": t.expected_capability,
+        "artifact_file": f"repo2task_artifacts/{t.task_id}/capability.md",
+        "required_contains": [
+            f"role: {t.role}",
+            f"task_type: {t.task_type}",
+            "status: implemented",
+        ],
+        "regression_baseline_command": t.baseline_command,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2) + "\n"
+
+
+def render_solution_sh(t: TaskPlan) -> str:
+    return "\n".join([
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "ROOT=\"$(cd \"$(dirname \"$0\")/..\" && pwd)\"",
+        "REPO_DIR=\"$ROOT/repo\"",
+        f"TASK_ID={json.dumps(t.task_id)}",
+        f"ROLE={json.dumps(t.role)}",
+        f"TASK_TYPE={json.dumps(t.task_type)}",
+        "",
+        "mkdir -p \"$REPO_DIR/repo2task_artifacts/$TASK_ID\"",
+        "cat > \"$REPO_DIR/repo2task_artifacts/$TASK_ID/capability.md\" <<'EOT'",
+        f"role: {t.role}",
+        f"task_type: {t.task_type}",
+        "status: implemented",
+        "EOT",
+        "",
+        "echo \"reference solution applied\"",
+        "",
+    ])
+
+
+def render_solution_md(t: TaskPlan) -> str:
+    return "\n".join([
+        f"# Reference Solution: {t.task_id}",
+        "",
+        "This reference implementation demonstrates minimal change strategy:",
+        "- keep original repo behavior unchanged",
+        "- add isolated capability artifact under `repo2task_artifacts/`",
+        "- satisfy behavior contract for deterministic validation",
+        "",
+        "You can replace this with a deeper implementation as long as tests pass.",
+        "",
+    ])
 
 
 def render_test_sh() -> str:
-    return "\n".join(
-        [
-            "#!/usr/bin/env bash",
-            "set -euo pipefail",
-            "",
-            "python3 -m pip install -q pytest",
-            "pytest -q test/test_state.py",
-            "",
-        ]
-    )
+    return "\n".join([
+        "#!/usr/bin/env bash",
+        "set -euo pipefail",
+        "",
+        "python3 -m pip install -q pytest",
+        "pytest -q test/phase1_install_check.py",
+        "pytest -q test/phase2_task_check.py",
+        "",
+    ])
 
 
-def render_test_state_py() -> str:
-    return "\n".join(
-        [
-            "from pathlib import Path",
-            "",
-            "BASE = Path(__file__).resolve().parent.parent",
-            "",
-            "",
-            "def test_required_files_exist():",
-            "    required = [",
-            "        BASE / 'instruction.md',",
-            "        BASE / 'task.toml',",
-            "        BASE / 'environment' / 'Dockerfile',",
-            "        BASE / 'environment' / 'skill_config.toml',",
-            "        BASE / 'environment' / 'io_config.json',",
-            "        BASE / 'solution' / 'solve.sh',",
-            "        BASE / 'solution' / 'solution.md',",
-            "        BASE / 'test' / 'test.sh',",
-            "        BASE / 'test' / 'test_state.py',",
-            "    ]",
-            "    for p in required:",
-            "        assert p.exists(), f'Missing file: {p}'",
-            "",
-            "",
-            "def test_instruction_has_problem_and_requirements():",
-            "    text = (BASE / 'instruction.md').read_text(encoding='utf-8')",
-            "    assert '问题' in text",
-            "    assert '开发要求' in text",
-            "    assert '验收标准' in text",
-            "",
-            "",
-            "def test_task_toml_has_core_sections():",
-            "    text = (BASE / 'task.toml').read_text(encoding='utf-8')",
-            "    for key in ['[metadata]', '[verifier]', '[agent]', '[environment]']:",
-            "        assert key in text",
-            "",
-        ]
-    ) + "\n"
+def render_phase1_py(meta: RepoMeta) -> str:
+    return "\n".join([
+        "from pathlib import Path",
+        "import subprocess",
+        "",
+        "ROOT = Path(__file__).resolve().parent.parent",
+        "REPO = ROOT / 'repo'",
+        f"EXPECTED_COMMIT = {json.dumps(meta.repo_commit)}",
+        "",
+        "",
+        "def run(cmd, cwd=None):",
+        "    return subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()",
+        "",
+        "",
+        "def test_setup_script_exists_and_runs():",
+        "    setup = ROOT / 'environment' / 'setup.sh'",
+        "    assert setup.exists()",
+        "    subprocess.run(['bash', str(setup)], check=True)",
+        "",
+        "",
+        "def test_repo_commit_is_fixed_version():",
+        "    commit = run(['git', '-C', str(REPO), 'rev-parse', 'HEAD'])",
+        "    assert commit == EXPECTED_COMMIT",
+        "",
+    ]) + "\n"
 
 
-def write_subtopic(out_repo: Path, repo: RepoMeta, plan: TopicPlan) -> None:
-    root = out_repo / plan.slug
-    env_dir = root / "environment"
-    sol_dir = root / "solution"
-    test_dir = root / "test"
-
-    env_dir.mkdir(parents=True, exist_ok=True)
-    sol_dir.mkdir(parents=True, exist_ok=True)
-    test_dir.mkdir(parents=True, exist_ok=True)
-
-    (root / "instruction.md").write_text(render_instruction(plan, repo), encoding="utf-8")
-    (root / "task.toml").write_text(render_task_toml(plan, repo), encoding="utf-8")
-
-    (env_dir / "Dockerfile").write_text(render_dockerfile(), encoding="utf-8")
-    (env_dir / "skill_config.toml").write_text(render_skill_config(repo, plan), encoding="utf-8")
-    (env_dir / "io_config.json").write_text(render_io_config(repo, plan), encoding="utf-8")
-
-    solve = sol_dir / "solve.sh"
-    solve.write_text(render_solution_sh(plan), encoding="utf-8")
-    solve.chmod(0o755)
-    (sol_dir / "solution.md").write_text(render_solution_md(plan, repo), encoding="utf-8")
-
-    t_sh = test_dir / "test.sh"
-    t_sh.write_text(render_test_sh(), encoding="utf-8")
-    t_sh.chmod(0o755)
-    (test_dir / "test_state.py").write_text(render_test_state_py(), encoding="utf-8")
-
-
-def write_output(out_root: Path, repo: RepoMeta, plans: List[TopicPlan]) -> Path:
-    repo_dir = out_root / normalize_repo_dirname(repo.name)
-    repo_dir.mkdir(parents=True, exist_ok=True)
-    for plan in plans:
-        write_subtopic(repo_dir, repo, plan)
-    return repo_dir
+def render_phase2_py() -> str:
+    return "\n".join([
+        "from pathlib import Path",
+        "import json",
+        "import subprocess",
+        "",
+        "ROOT = Path(__file__).resolve().parent.parent",
+        "REPO = ROOT / 'repo'",
+        "",
+        "",
+        "def run(cmd, cwd=None):",
+        "    return subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()",
+        "",
+        "",
+        "def test_reference_solution_and_behavior_contract():",
+        "    subprocess.run(['bash', str(ROOT / 'solution' / 'solve.sh')], check=True)",
+        "    contract = json.loads((ROOT / 'solution' / 'behavior_contract.json').read_text(encoding='utf-8'))",
+        "    artifact = REPO / contract['artifact_file']",
+        "    assert artifact.exists(), f'Missing artifact: {artifact}'",
+        "    text = artifact.read_text(encoding='utf-8')",
+        "    for marker in contract['required_contains']:",
+        "        assert marker in text",
+        "",
+        "",
+        "def test_no_regression_baseline_command_still_runs():",
+        "    contract = json.loads((ROOT / 'solution' / 'behavior_contract.json').read_text(encoding='utf-8'))",
+        "    cmd = contract['regression_baseline_command']",
+        "    # behavior-based check: command should execute without non-deterministic assertions",
+        "    subprocess.run(['bash', '-lc', cmd], cwd=str(REPO), check=True)",
+        "",
+    ]) + "\n"
 
 
-def build_from_repo(repo_arg: str, out: Path) -> Path:
-    repo_path, tmp = resolve_repo(repo_arg)
+def write_file(path: Path, content: str, executable: bool = False) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+    if executable:
+        path.chmod(0o755)
+
+
+def write_task_bundle(root: Path, meta: RepoMeta, understanding: Understanding, cap_map: CapabilityMap, task: TaskPlan) -> None:
+    task_dir = root / task.task_id
+
+    write_file(task_dir / "instruction.md", render_instruction(meta, understanding, cap_map, task))
+    write_file(task_dir / "task.toml", render_task_toml(meta, task))
+
+    write_file(task_dir / "environment" / "Dockerfile", render_dockerfile())
+    write_file(task_dir / "environment" / "setup.sh", render_setup_sh(meta), executable=True)
+
+    write_file(task_dir / "solution" / "solve.sh", render_solution_sh(task), executable=True)
+    write_file(task_dir / "solution" / "solution.md", render_solution_md(task))
+    write_file(task_dir / "solution" / "behavior_contract.json", render_behavior_contract(task))
+
+    write_file(task_dir / "test" / "test.sh", render_test_sh(), executable=True)
+    write_file(task_dir / "test" / "phase1_install_check.py", render_phase1_py(meta))
+    write_file(task_dir / "test" / "phase2_task_check.py", render_phase2_py())
+
+
+def build(repo_arg: str, out: Path, category: str = "secondary-development", language: str = "unknown") -> Path:
+    repo_path, tmp, repo_url, repo_commit = resolve_repo(repo_arg)
     try:
-        files = candidate_files(repo_path)
-        blob = load_text(files)
-        topics = extract_topics(blob)
-        name = repo_arg if "/" in repo_arg else repo_path.name
-        repo = RepoMeta(name=name)
-        plans = build_plans(topics, repo.name)
-        generated = write_output(out, repo, plans)
-        print(f"Generated repo task package: {generated}")
-        return generated
+        repo_name = extract_owner_repo(repo_arg) or repo_path.name
+        docs = docs_files(repo_path)
+        mode = detect_mode(docs)
+
+        meta = RepoMeta(
+            repo_input=repo_arg,
+            repo_url=repo_url,
+            repo_commit=repo_commit,
+            repo_name=repo_name,
+            mode=mode,
+            category=category,
+            language=language,
+        )
+
+        understanding = build_understanding(repo_path, docs, mode)
+        cap_map = build_capability_map(repo_path, docs, mode)
+        tasks = make_task_plans(meta, understanding, cap_map)
+
+        out_root = out / slug(repo_name)
+        out_root.mkdir(parents=True, exist_ok=True)
+        for t in tasks:
+            write_task_bundle(out_root, meta, understanding, cap_map, t)
+
+        print(f"Generated: {out_root}")
+        return out_root
     finally:
         if tmp is not None:
             tmp.cleanup()
 
 
 def build_from_json(json_path: Path, index: int, out: Path) -> Path:
-    repo = load_repo_meta_from_json(json_path, index)
-    print(f"Selected repo[{index}]: {repo.name}")
-    repo_path, tmp = resolve_repo(repo.name)
-    try:
-        files = candidate_files(repo_path)
-        blob = load_text(files)
-        topics = extract_topics(blob)
-        plans = build_plans(topics, repo.name)
-        generated = write_output(out, repo, plans)
-        print(f"Generated repo task package: {generated}")
-        return generated
-    finally:
-        if tmp is not None:
-            tmp.cleanup()
+    obj = load_repos_json(json_path, index)
+    print(f"Selected repo[{index}]: {obj['name']}")
+    return build(obj["name"], out, category=obj["category"], language=obj["language"])
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Generate repo2task outputs")
+    parser = argparse.ArgumentParser(description="Generate repo2task benchmark bundles")
     sub = parser.add_subparsers(dest="cmd", required=True)
 
-    p1 = sub.add_parser("build", help="Build from local path / github URL / owner/repo")
+    p1 = sub.add_parser("build")
     p1.add_argument("--repo", required=True)
     p1.add_argument("--out", required=True)
 
-    p2 = sub.add_parser("build-from-json", help="Build from repos.json by index")
+    p2 = sub.add_parser("build-from-json")
     p2.add_argument("--repos-json", required=True)
     p2.add_argument("--index", type=int, default=0)
     p2.add_argument("--out", required=True)
@@ -623,7 +754,7 @@ def main() -> None:
     out = Path(args.out).resolve()
 
     if args.cmd == "build":
-        build_from_repo(args.repo, out)
+        build(args.repo, out)
     else:
         build_from_json(Path(args.repos_json).resolve(), args.index, out)
 

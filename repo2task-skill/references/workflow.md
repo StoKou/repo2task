@@ -1,23 +1,53 @@
 # Workflow Reference
 
-## Primary Scan Order
+This file defines the canonical repo2task process.
 
-1. `examples/` or `example/`
-2. `docs/` or `doc/`
-3. root `README*`
+## Step 1: Quickstart Understanding
 
-This order biases toward runnable usage patterns before narrative docs.
+Preferred sources:
+1. `examples/` and `docs/`
+2. `README*`
+3. entry points from code when docs are missing
 
-## Requirement Quality Bar
+Required outputs:
+- what the repo does
+- use cases
+- input/output
+- minimal runnable example
 
-Each requirement should:
-- be a secondary-development task (not full rewrite)
-- specify one mode: new feature / dependency swap / aggregation
-- define acceptance criteria that can be tested
+## Step 2: Capability Abstraction
 
-## Task Quality Bar
+Required capability map fields:
+- core functionalities
+- key modules
+- interfaces
+- workflows
+- extension points
+- replaceable components
 
-Each task should:
-- map to exactly one primary requirement
-- include module boundary and integration impact
-- define at least one happy path + one error path test
+## Step 3: Role-based Tasks
+
+Minimum roles:
+- Product Engineer
+- Integration Engineer
+- Platform Engineer
+- QA Engineer
+
+Each task must include entry points tied to real files.
+
+## Step 4: Modification Planning
+
+Each task must include:
+- file list
+- function/component changes
+- behavior delta
+- minimal modification justification
+
+## Step 5: Packaging
+
+Each task directory is isolated and benchmark-ready:
+- `instruction.md`
+- `task.toml`
+- `environment/`
+- `solution/`
+- `test/`

@@ -1,61 +1,136 @@
 ---
 name: repo2task
-description: Parse a GitHub/local repository and generate benchmark-style secondary-development task bundles from examples/docs/readme.
+description: Convert a GitHub/local repository into executable benchmark task bundles using Step 1-5 flow: quickstart understanding, capability abstraction, role-based task generation, mandatory modification planning, and reproducible packaging.
 ---
 
 # Repo2Task Skill
 
-Use this skill when the user asks to parse a repository and output secondary-development task bundles.
+Use this skill when the user wants to parse a repository and produce executable, testable, reproducible secondary-development task packages.
 
-## Mandatory Pipeline
+## Core Objective
 
-1. Resolve source repository:
-- Accept local path, GitHub URL, or `owner/repo`.
-- If remote, perform shallow clone first (`git clone --depth 1`).
+Transform one repository into multiple isolated task bundles. Each bundle must include:
+- clear instruction (`instruction.md`)
+- task metadata with fixed commit (`task.toml`)
+- containerized environment (`environment/`)
+- reference solution (`solution/`)
+- automated verification (`test/`)
 
-2. Read knowledge sources in this order:
-- `examples/` or `example/`
-- `docs/` or `doc/`
-- root `README*`
+## Step-by-Step Workflow (Mandatory)
 
-3. Build concept-driven requirements:
-- Each requirement must begin with concept understanding.
-- Requirement content must be non-trivial (compatibility, rollback, observability, risk).
+### Step 1: Quickstart Understanding
 
-4. Generate output with fixed structure:
-- `<out>/<gitname>/<subtopic>/instruction.md` (问题说明)
-- `<out>/<gitname>/<subtopic>/task.toml` (任务元信息)
-- `<out>/<gitname>/<subtopic>/environment/` (Docker + skill/io 配置)
-- `<out>/<gitname>/<subtopic>/solution/` (解决脚本与说明)
-- `<out>/<gitname>/<subtopic>/test/` (校验脚本)
+Extract:
+- repository purpose
+- target use cases
+- input/output patterns
+- minimal runnable usage
 
-## Command
+Mode switching rules:
+- Mode A (documentation-driven): `README/docs/examples` first
+- Mode B (code-driven fallback): infer from entry points and modules if docs are missing
+
+### Step 2: Capability Abstraction
+
+Build a capability map including:
+- core functionalities
+- key modules and responsibilities
+- interfaces (CLI/API/library)
+- existing workflows
+- extension points
+- replaceable components
+
+### Step 3: Role-based Task Generation
+
+Generate at least 4 tasks from these roles:
+- Product Engineer
+- Integration Engineer
+- Platform Engineer
+- QA Engineer
+
+Task constraints:
+- grounded in real repository capabilities
+- feasible without full rewrite
+- explicit entry points and expected capability
+
+### Step 4: Modification Planning (Required)
+
+For each task, explicitly define:
+- files to modify
+- functions/components to add or change
+- expected behavior changes
+- minimal-change justification
+
+### Step 5: Task Packaging
+
+Package each task independently as:
+
+```text
+task_xxx/
+├── instruction.md
+├── task.toml
+├── environment/
+├── solution/
+└── test/
+```
+
+## Generated File Requirements
+
+### instruction.md
+Must include:
+- task description
+- motivation
+- expected behavior
+- constraints
+- affected modules/files
+- Step 1-4 analysis summary
+
+### task.toml
+Must include:
+- `repo_url`
+- `repo_commit` (fixed hash, never branch)
+- `role`
+- `task_type`
+- `difficulty`
+- `entry_points`
+- `expected_capability`
+- environment setup info
+- test references
+
+### environment/
+Must include:
+- `Dockerfile`
+- `setup.sh`
+
+Must support:
+- repository checkout to fixed commit
+- dependency installation
+- minimal runnable baseline state
+
+### solution/
+Contains reference implementation:
+- minimal code changes only
+- scripts/patch/files as needed
+
+### test/
+Must include:
+- Phase 1 installation verification
+- Phase 2 task verification
+- deterministic behavior checks (no implementation coupling)
+
+## Script Entry
 
 ```bash
 python3 scripts/generate_repo2task.py build --repo <path|url|owner/repo> --out <output-dir>
 ```
 
-Or from repository list json:
-
 ```bash
-python3 scripts/generate_repo2task.py build-from-json \
-  --repos-json <repos.json> \
-  --index 0 \
-  --out <output-dir>
+python3 scripts/generate_repo2task.py build-from-json --repos-json <repos.json> --index 0 --out <output-dir>
 ```
-
-## Output Quality Rules
-
-- One `subtopic` directory = one requirement.
-- `instruction.md` must describe a concrete problem and constraints.
-- `task.toml` must include metadata/verifier/agent/environment sections.
-- `environment/` must include `Dockerfile`, `skill_config.toml`, `io_config.json`.
-- `solution/` must include executable commands and written notes.
-- `test/` must include runnable verification scripts.
 
 ## References
 
 - `references/workflow.md`
 - `references/task-schema.md`
-- `assets/requirement_template.md`
-- `assets/task_template.md`
+- `assets/instruction_template.md`
+- `assets/task_toml_template.toml`

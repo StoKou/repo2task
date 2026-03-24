@@ -1,0 +1,10 @@
+repo_url = ""
+repo_commit = ""
+role = ""
+task_type = ""
+difficulty = ""
+entry_points = []
+expected_capability = ""
+baseline_command = ""
+phase1_test = "test/phase1_install_check.py"
+phase2_test = "test/phase2_task_check.py"
