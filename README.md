@@ -13,8 +13,8 @@
 - 让 AI 不止会解释仓库，更会推进仓库改造。
 
 `repo2task` 会先理解仓库文档与 examples，再优先挖掘 GitHub 上真实的 `PR/issue` 作为任务来源，并将通过筛选的候选重写成 benchmark 风格任务目录：
-- `instruction.md`（仅问题定义）
-- `meta_info.md`（动机、来源、锚点与分析）
+- `instruction.md`（只保留任务本身）
+- `meta_info.md`（动机、预期行为、约束、来源、锚点与分析）
 - `task.toml`（任务元信息）
 - `environment/`（仅 `Dockerfile`）
 - `solution/`（解题脚本与说明）

@@ -25,10 +25,11 @@
 
 必须包含：
 - Task Description
-- Expected Behavior
-- Constraints
+- 仅问题本身的要求与描述
 
 不应包含：
+- 预期行为
+- 约束条件
 - 动机
 - 涉及文件
 - 原始 PR/issue 来源说明
@@ -40,6 +41,8 @@
 
 必须包含：
 - Motivation
+- Expected Behavior
+- Constraints
 - Affected Modules/Files
 - Original PR/issue summary
 - What was rewritten

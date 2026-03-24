@@ -112,14 +112,14 @@ task_xxx/
 ### `instruction.md`
 Must include:
 - task description
-- expected behavior
-- constraints
 
-`instruction.md` should only contain the problem statement itself. Do not place source provenance, motivation, file anchors, or workflow analysis in this file.
+`instruction.md` should only contain the problem statement itself. Do not place expected behavior, constraints, source provenance, motivation, file anchors, or workflow analysis in this file.
 
 ### `meta_info.md`
 Must include:
 - motivation
+- expected behavior
+- constraints
 - affected modules/files
 - original PR/issue summary
 - what was rewritten

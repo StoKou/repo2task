@@ -468,17 +468,7 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
         "",
         "## Task Description",
         f"- Description: Implement a `{t.task_type}` task grounded in repository entry points.",
-        f"- Task type: `{t.task_type}`",
-        f"- Difficulty: `{t.difficulty}`",
-        "",
-        "## Expected Behavior",
-        f"- Expected capability: {t.expected_capability}",
-        f"- Observable changes: {'; '.join(t.behavior_changes)}",
-        f"- Baseline command must still pass: `{t.baseline_command}`",
-        "",
-        "## Constraints",
     ]
-    lines.extend([f"- {x}" for x in t.constraints])
     lines.extend([""])
     return "\n".join(lines)
 
@@ -496,9 +486,19 @@ def render_meta_info(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Task
         "- This task exercises practical secondary development while preserving the baseline workflow.",
         "- The benchmark stays anchored to repository behavior rather than generic problem invention.",
         "",
+        "## Expected Behavior",
+        f"- Expected capability: {t.expected_capability}",
+        f"- Observable changes: {'; '.join(t.behavior_changes)}",
+        f"- Baseline command must still pass: `{t.baseline_command}`",
+        "",
+        "## Constraints",
+    ]
+    lines.extend([f"- {x}" for x in t.constraints])
+    lines.extend([
+        "",
         "## Affected Modules/Files",
         "- Entry points:",
-    ]
+    ])
     lines.extend([f"  - {x}" for x in t.entry_points])
     lines.extend(["- Files to modify:"])
     lines.extend([f"  - {x}" for x in t.files_to_modify])
