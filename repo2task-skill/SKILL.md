@@ -1,6 +1,6 @@
 ---
 name: repo2task
-description: Convert a GitHub/local repository into executable benchmark task bundles using a strict Step 1-5 flow: quickstart understanding, capability abstraction, role-based task generation, mandatory modification planning, and reproducible packaging.
+description: "Convert a GitHub/local repository into executable benchmark task bundles using a strict Step 1-5 flow: quickstart understanding, capability abstraction, role-based task generation, mandatory modification planning, and reproducible packaging."
 ---
 
 # Repo2Task Skill
