@@ -33,6 +33,17 @@ from urllib.request import urlretrieve
 
 MAX_DOC_BYTES = 20000
 MAX_TOPICS = 8
+EXCLUDED_DIR_KEYWORDS = (
+    ".git/",
+    "node_modules/",
+    "/dist/",
+    "/build/",
+    "/generated/",
+    "/generated-local/",
+    "/generated-batch/",
+    "/.venv/",
+    "/venv/",
+)
 
 ROLE_SPECS = [
     ("Product Engineer", "new_feature", "medium"),
@@ -206,9 +217,16 @@ def docs_files(repo: Path) -> List[Path]:
         f = repo / readme
         if f.exists():
             files.append(f)
+    for root_doc in ("QUICKSTART.md", "EXAMPLES.md"):
+        f = repo / root_doc
+        if f.exists():
+            files.append(f)
     seen = set()
     out: List[Path] = []
     for f in files:
+        rel = str(f.relative_to(repo))
+        if any(key in f"/{rel}" for key in EXCLUDED_DIR_KEYWORDS):
+            continue
         k = str(f.resolve())
         if k not in seen:
             seen.add(k)
@@ -226,9 +244,7 @@ def source_files(repo: Path) -> List[Path]:
     filtered = []
     for f in out:
         rel = str(f.relative_to(repo))
-        if rel.startswith(".git/") or "/.git/" in rel:
-            continue
-        if "node_modules/" in rel or "/dist/" in rel or "/build/" in rel:
+        if any(key in f"/{rel}" for key in EXCLUDED_DIR_KEYWORDS):
             continue
         filtered.append(f)
     return filtered[:500]
@@ -260,18 +276,50 @@ def detect_mode(doc_paths: List[Path]) -> str:
 
 
 def extract_minimal_usage_from_docs(doc_paths: List[Path]) -> str:
+    preferred = (
+        "generate_repo2task.py",
+        "build --repo",
+        "python",
+        "pytest",
+        "npm",
+        "node",
+        "go ",
+        "cargo",
+        "make",
+        "./",
+        "bash ",
+    )
+    fallback = ""
     for p in doc_paths:
         text = read_text(p)
-        block = re.search(r"```(?:bash|sh)?\n(.*?)\n```", text, flags=re.S)
-        if block:
+        for block in re.finditer(r"```(?:bash|sh)?\n(.*?)\n```", text, flags=re.S):
             cmd_lines = [x.strip() for x in block.group(1).strip().splitlines() if x.strip()]
-            for line in cmd_lines:
+            i = 0
+            while i < len(cmd_lines):
+                line = cmd_lines[i]
                 if line.startswith("#"):
+                    i += 1
                     continue
-                if "<" in line or ">" in line:
+                candidate = line
+                while candidate.endswith("\\") and i + 1 < len(cmd_lines):
+                    i += 1
+                    candidate = candidate[:-1].rstrip() + " " + cmd_lines[i].lstrip()
+
+                if "<" in candidate or ">" in candidate:
+                    i += 1
                     continue
-                return line
-    return ""
+                lowered = candidate.lower()
+                if lowered.startswith(("export ", "mkdir ", "cp ", "mv ", "echo ")):
+                    if not fallback:
+                        fallback = candidate
+                    i += 1
+                    continue
+                if any(token in lowered for token in preferred):
+                    return candidate
+                if not fallback:
+                    fallback = candidate
+                i += 1
+    return fallback
 
 
 def fallback_minimal_usage_from_code(repo: Path) -> str:
@@ -418,11 +466,44 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
     lines = [
         f"# {t.task_id}: {t.title}",
         "",
+        "## Task Description",
+        f"- Description: Implement a `{t.task_type}` task grounded in repository entry points.",
+        f"- Role: `{t.role}`",
+        f"- Task type: `{t.task_type}`",
+        f"- Difficulty: `{t.difficulty}`",
+        "",
+        "## Motivation",
+        "- This task exercises practical secondary development while preserving the baseline workflow.",
+        "",
+        "## Expected Behavior",
+        f"- Expected capability: {t.expected_capability}",
+        f"- Observable changes: {'; '.join(t.behavior_changes)}",
+        f"- Baseline command must still pass: `{t.baseline_command}`",
+        "",
+        "## Constraints",
+    ]
+    lines.extend([f"- {x}" for x in t.constraints])
+    lines.extend([
+        "",
+        "## Affected Modules/Files",
+        "- Entry points:",
+    ])
+    lines.extend([f"  - {x}" for x in t.entry_points])
+    lines.extend([
+        "- Files to modify:",
+    ])
+    lines.extend([f"  - {x}" for x in t.files_to_modify])
+    lines.extend([
+        "- Functions/components to add/change:",
+    ])
+    lines.extend([f"  - {x}" for x in t.functions_to_change])
+    lines.extend([
+        "",
         "## Step 1: Quickstart Understanding",
         f"- Understanding mode: `{meta.mode}`",
         f"- Repository purpose: {u.purpose}",
         "- Target use cases:",
-    ]
+    ])
     lines.extend([f"  - {x}" for x in u.use_cases])
     lines.extend([
         f"- Input/output format: {u.input_output}",
@@ -456,15 +537,15 @@ def render_instruction(meta: RepoMeta, u: Understanding, c: CapabilityMap, t: Ta
     lines.extend([
         "",
         "## Step 4: Modification Planning (MANDATORY)",
-        "- Files to modify:",
+        "- Expected behavior changes:",
     ])
-    lines.extend([f"  - {x}" for x in t.files_to_modify])
-    lines.extend(["- Functions/components to add/change:"])
-    lines.extend([f"  - {x}" for x in t.functions_to_change])
-    lines.extend(["- Expected behavior changes:"])
     lines.extend([f"  - {x}" for x in t.behavior_changes])
     lines.extend([
         f"- Minimal modification justification: {t.minimal_justification}",
+        "",
+        "## Step 1-4 Analysis Summary",
+        f"- Summary: `{meta.mode}` analysis identified capability focus on \"{(c.core_functions[0] if c.core_functions else 'core workflow')}\". "
+        f"Task targets `{t.role}` outcomes through incremental edits on {', '.join(t.entry_points)} with behavior-safe validation.",
         "",
         "## Delivery Constraints",
         "- Use fixed commit from task.toml",

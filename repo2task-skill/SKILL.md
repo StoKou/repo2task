@@ -1,57 +1,58 @@
 ---
 name: repo2task
-description: Convert a GitHub/local repository into executable benchmark task bundles using Step 1-5 flow: quickstart understanding, capability abstraction, role-based task generation, mandatory modification planning, and reproducible packaging.
+description: Convert a GitHub/local repository into executable benchmark task bundles using a strict Step 1-5 flow: quickstart understanding, capability abstraction, role-based task generation, mandatory modification planning, and reproducible packaging.
 ---
 
 # Repo2Task Skill
 
-Use this skill when the user wants to parse a repository and produce executable, testable, reproducible secondary-development task packages.
+Use this skill when the user wants to transform one repository into executable, testable, reproducible secondary-development task bundles.
 
 ## Core Objective
 
-Transform one repository into multiple isolated task bundles. Each bundle must include:
-- clear instruction (`instruction.md`)
-- task metadata with fixed commit (`task.toml`)
-- containerized environment (`environment/`)
-- reference solution (`solution/`)
-- automated verification (`test/`)
+Generate multiple isolated tasks from one source repository. Every task must be runnable independently and include:
+- `instruction.md`
+- `task.toml`
+- `environment/`
+- `solution/`
+- `test/`
 
-## Step-by-Step Workflow (Mandatory)
+## Mandatory Workflow (Step 1-5)
 
 ### Step 1: Quickstart Understanding
 
-Extract:
+Collect and summarize:
 - repository purpose
 - target use cases
 - input/output patterns
 - minimal runnable usage
 
-Mode switching rules:
-- Mode A (documentation-driven): `README/docs/examples` first
-- Mode B (code-driven fallback): infer from entry points and modules if docs are missing
+Mode selection:
+- Mode A (`documentation-driven`): prioritize `README*`, `docs/`, `examples/`
+- Mode B (`code-driven` fallback): infer from entry points/modules when docs are insufficient
 
 ### Step 2: Capability Abstraction
 
-Build a capability map including:
+Produce a capability map covering:
 - core functionalities
-- key modules and responsibilities
-- interfaces (CLI/API/library)
+- key modules + responsibilities
+- exposed interfaces (`CLI`/`API`/library)
 - existing workflows
 - extension points
 - replaceable components
 
 ### Step 3: Role-based Task Generation
 
-Generate at least 4 tasks from these roles:
+Generate at least 4 tasks, one per role:
 - Product Engineer
 - Integration Engineer
 - Platform Engineer
 - QA Engineer
 
-Task constraints:
+Task quality requirements:
 - grounded in real repository capabilities
-- feasible without full rewrite
-- explicit entry points and expected capability
+- feasible by incremental change (no full rewrite)
+- explicit entry points
+- explicit expected capability outcome
 
 ### Step 4: Modification Planning (Required)
 
@@ -63,7 +64,7 @@ For each task, explicitly define:
 
 ### Step 5: Task Packaging
 
-Package each task independently as:
+Package each task as:
 
 ```text
 task_xxx/
@@ -74,9 +75,9 @@ task_xxx/
 └── test/
 ```
 
-## Generated File Requirements
+## Generated Files: Hard Requirements
 
-### instruction.md
+### `instruction.md`
 Must include:
 - task description
 - motivation
@@ -85,7 +86,7 @@ Must include:
 - affected modules/files
 - Step 1-4 analysis summary
 
-### task.toml
+### `task.toml`
 Must include:
 - `repo_url`
 - `repo_commit` (fixed hash, never branch)
@@ -94,25 +95,25 @@ Must include:
 - `difficulty`
 - `entry_points`
 - `expected_capability`
-- environment setup info
+- environment setup references
 - test references
 
-### environment/
+### `environment/`
 Must include:
 - `Dockerfile`
 - `setup.sh`
 
-Must support:
-- repository checkout to fixed commit
+`setup.sh` must support:
+- checkout to fixed commit
 - dependency installation
 - minimal runnable baseline state
 
-### solution/
-Contains reference implementation:
-- minimal code changes only
-- scripts/patch/files as needed
+### `solution/`
+Reference implementation must:
+- use minimal code changes only
+- include files/scripts/patches needed to demonstrate expected capability
 
-### test/
+### `test/`
 Must include:
 - Phase 1 installation verification
 - Phase 2 task verification
@@ -127,6 +128,14 @@ python3 scripts/generate_repo2task.py build --repo <path|url|owner/repo> --out <
 ```bash
 python3 scripts/generate_repo2task.py build-from-json --repos-json <repos.json> --index 0 --out <output-dir>
 ```
+
+## Execution Rules
+
+- Always pin to immutable commit hash in generated `task.toml`.
+- Never use branch names as source of truth.
+- Keep task bundles isolated from each other.
+- Prefer deterministic checks over snapshot-style coupling.
+- If repository docs are weak, explicitly declare mode switch to code-driven inference.
 
 ## References
 

@@ -1,53 +1,72 @@
 # Workflow Reference
 
-This file defines the canonical repo2task process.
+This document defines the canonical repo2task process. All generated tasks must follow this sequence exactly.
 
 ## Step 1: Quickstart Understanding
 
-Preferred sources:
-1. `examples/` and `docs/`
-2. `README*`
-3. entry points from code when docs are missing
+Goal: establish a minimal, runnable understanding of the repository.
 
-Required outputs:
-- what the repo does
-- use cases
-- input/output
-- minimal runnable example
+Inputs (priority order):
+1. `README*`
+2. `docs/`, `examples/`
+3. source entry points (fallback)
+
+Mode rules:
+- Use `documentation-driven` if docs provide actionable usage.
+- Switch to `code-driven` when docs are absent/insufficient.
+
+Required output fields:
+- repository purpose
+- target use cases
+- input/output patterns
+- minimal runnable command
 
 ## Step 2: Capability Abstraction
 
-Required capability map fields:
+Build a capability map with these required fields:
 - core functionalities
-- key modules
-- interfaces
-- workflows
+- key modules and responsibilities
+- interfaces (`CLI`, `API`, library)
+- existing workflows
 - extension points
 - replaceable components
 
-## Step 3: Role-based Tasks
+## Step 3: Role-based Task Generation
 
-Minimum roles:
+Generate at least 4 tasks and cover all required roles:
 - Product Engineer
 - Integration Engineer
 - Platform Engineer
 - QA Engineer
 
-Each task must include entry points tied to real files.
+Constraints per task:
+- task is anchored to real repository files
+- task is feasible with incremental edits
+- entry points are explicit
+- expected capability is explicit and testable
 
-## Step 4: Modification Planning
+## Step 4: Modification Planning (Mandatory)
 
-Each task must include:
-- file list
-- function/component changes
-- behavior delta
-- minimal modification justification
+For each task, define:
+- files to modify
+- functions/components to add or change
+- expected behavior delta
+- minimal-change justification
 
-## Step 5: Packaging
+## Step 5: Task Packaging
 
-Each task directory is isolated and benchmark-ready:
-- `instruction.md`
-- `task.toml`
-- `environment/`
-- `solution/`
-- `test/`
+Each task must be isolated and reproducible:
+
+```text
+task_xxx/
+├── instruction.md
+├── task.toml
+├── environment/
+├── solution/
+└── test/
+```
+
+Quality bar:
+- fixed commit hash only
+- deterministic tests
+- behavior-based assertions (avoid implementation coupling)

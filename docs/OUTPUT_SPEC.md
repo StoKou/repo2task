@@ -3,61 +3,72 @@
 每个子任务目录必须满足以下结构：
 
 ```text
-<out>/<gitname>/<subtopic>/
+<out>/<repo-slug>/task_xxx/
 ├── instruction.md
 ├── task.toml
 ├── environment/
 │   ├── Dockerfile
-│   ├── skill_config.toml
-│   └── io_config.json
+│   └── setup.sh
 ├── solution/
 │   ├── solve.sh
-│   └── solution.md
+│   ├── solution.md
+│   └── behavior_contract.json
 └── test/
     ├── test.sh
-    └── test_state.py
+    ├── phase1_install_check.py
+    └── phase2_task_check.py
 ```
 
 ## instruction.md
 
-用途：描述具体问题与开发边界。
+用途：定义任务目标、约束和 Step 1-4 分析链路。
 
-最少包含：
-- 问题
-- 背景
-- 目标
-- 开发要求
-- 验收标准
-- 风险与约束
+必须包含：
+- Task Description
+- Motivation
+- Expected Behavior
+- Constraints
+- Affected Modules/Files
+- Step 1-4 Analysis Summary
 
 ## task.toml
 
-用途：定义任务元信息与执行资源。
+用途：固定任务元信息和可复现执行锚点。
 
-核心段：
-- `[metadata]`
-- `[verifier]`
-- `[agent]`
-- `[environment]`
+必须包含：
+- `repo_url`
+- `repo_commit`（固定 commit hash）
+- `role`
+- `task_type`
+- `difficulty`
+- `entry_points`
+- `expected_capability`
+- 环境引用：`environment_dockerfile`、`environment_setup`
+- 测试引用：`phase1_test`、`phase2_test`
 
 ## environment/
 
-用途：定义运行环境与输入输出约束。
+用途：定义可复现环境构建与仓库初始化。
 
-- `Dockerfile`: 任务容器基础环境
-- `skill_config.toml`: skill 名称、repo、subtopic、开发模式
-- `io_config.json`: 输入/输出预期
+- `Dockerfile`: 基础运行环境
+- `setup.sh`: 拉取仓库并切换到固定 commit，安装依赖并建立 baseline 可运行状态
 
 ## solution/
 
-用途：提供解题入口与说明。
+用途：提供参考实现（最小改动策略）。
 
-- `solve.sh`: 执行脚本（可替换为真实实现命令）
-- `solution.md`: 方案步骤与变更范围说明
+- `solve.sh`: 参考实现执行脚本
+- `solution.md`: 变更说明
+- `behavior_contract.json`: 行为验收契约
 
 ## test/
 
-用途：自动校验任务包完整性。
+用途：两阶段自动验证。
 
-- `test.sh`: 统一测试入口
-- `test_state.py`: 结构与关键字段断言
+- Phase 1（`phase1_install_check.py`）:
+  - 验证 setup 成功
+  - 验证固定 commit 检出
+- Phase 2（`phase2_task_check.py`）:
+  - 验证能力行为产出
+  - 验证 baseline 无回归
+  - 断言基于行为，不耦合实现细节

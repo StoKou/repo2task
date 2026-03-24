@@ -13,12 +13,10 @@ python3 repo2task-skill/scripts/generate_repo2task.py \
 
 ```text
 generated/junegunn-fzf/
-└── 01-vim-neovim-plugin/
-    ├── instruction.md
-    ├── task.toml
-    ├── environment/
-    ├── solution/
-    └── test/
+├── task_001/
+├── task_002/
+├── task_003/
+└── task_004/
 ```
 
 ## 示例 2：从本地仓库生成
@@ -35,19 +33,18 @@ python3 repo2task-skill/scripts/generate_repo2task.py \
 ```bash
 python3 repo2task-skill/scripts/generate_repo2task.py \
   build-from-json \
-  --repos-json /mnt/d/2026/skillsfolder/code/data/reposkills/repos.json \
+  --repos-json /path/to/repos.json \
   --index 3 \
   --out ./generated-batch
 ```
 
-## 示例 4：仅验证某个子任务结构
+## 示例 4：验证某个任务包
 
 ```bash
-cd generated/junegunn-fzf/01-vim-neovim-plugin
+cd generated/junegunn-fzf/task_001
 bash test/test.sh
 ```
 
-这个校验会检查：
-- 必要文件是否存在
-- `instruction.md` 是否包含问题、开发要求、验收标准
-- `task.toml` 是否包含核心段落
+校验包含：
+- Phase 1：安装与固定 commit 检查
+- Phase 2：任务行为与 baseline 回归检查

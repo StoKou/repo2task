@@ -8,7 +8,7 @@ mkdir -p "$CODEX_HOME/skills"
 cp -R ./repo2task-skill "$CODEX_HOME/skills/repo2task"
 ```
 
-## 2) 用脚本生成任务包
+## 2) 生成任务包
 
 以 GitHub 仓库为输入：
 
@@ -24,20 +24,20 @@ python3 repo2task-skill/scripts/generate_repo2task.py \
 ```bash
 python3 repo2task-skill/scripts/generate_repo2task.py \
   build-from-json \
-  --repos-json /mnt/d/2026/skillsfolder/code/data/reposkills/repos.json \
+  --repos-json /path/to/repos.json \
   --index 0 \
   --out ./generated
 ```
 
-## 3) 进入某个子任务并执行校验
+## 3) 执行某个任务包校验
 
 ```bash
-cd generated/junegunn-fzf/01-vim-neovim-plugin
+cd generated/junegunn-fzf/task_001
 bash test/test.sh
 ```
 
 ## 4) 在对话中触发 Skill
 
 ```text
-请使用 repo2task skill，基于 junegunn/fzf 生成 benchmark 风格任务包。
+请使用 repo2task skill，解析这个仓库并生成可执行任务包：https://github.com/junegunn/fzf
 ```

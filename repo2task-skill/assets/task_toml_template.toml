@@ -1,10 +1,25 @@
+version = "1.0"
 repo_url = ""
 repo_commit = ""
+
 role = ""
 task_type = ""
 difficulty = ""
 entry_points = []
 expected_capability = ""
+
+# baseline behavior command from Step 1
 baseline_command = ""
+
+# environment setup references
+environment_dockerfile = "environment/Dockerfile"
+environment_setup = "environment/setup.sh"
+
+# test references
 phase1_test = "test/phase1_install_check.py"
 phase2_test = "test/phase2_task_check.py"
+
+# optional task metadata
+category = "secondary-development"
+language = "unknown"
+behavior_contract = "solution/behavior_contract.json"
