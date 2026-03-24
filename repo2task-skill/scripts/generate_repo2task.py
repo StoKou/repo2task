@@ -7,7 +7,6 @@ Output:
   task.toml
   environment/
     Dockerfile
-    setup.sh
   solution/
     solve.sh
     solution.md
@@ -570,7 +569,6 @@ def render_task_toml(meta: RepoMeta, t: TaskPlan) -> str:
         f'expected_capability = {json.dumps(t.expected_capability)}',
         f'baseline_command = {json.dumps(t.baseline_command)}',
         'environment_dockerfile = "environment/Dockerfile"',
-        'environment_setup = "environment/setup.sh"',
         'phase1_test = "test/phase1_install_check.py"',
         'phase2_test = "test/phase2_task_check.py"',
         'behavior_contract = "solution/behavior_contract.json"',
@@ -578,55 +576,40 @@ def render_task_toml(meta: RepoMeta, t: TaskPlan) -> str:
     ])
 
 
-def render_dockerfile() -> str:
+def render_dockerfile(meta: RepoMeta) -> str:
     return "\n".join([
         "FROM ubuntu:24.04",
         "",
+        "ARG REPO_URL=" + json.dumps(meta.repo_url),
+        "ARG REPO_COMMIT=" + json.dumps(meta.repo_commit),
         "WORKDIR /workspace",
         "",
         "RUN apt-get update && apt-get install -y \\",
         "  bash ca-certificates curl git python3 python3-pip \\",
         "  && rm -rf /var/lib/apt/lists/*",
         "",
-    ])
-
-
-def render_setup_sh(meta: RepoMeta) -> str:
-    return "\n".join([
-        "#!/usr/bin/env bash",
-        "set -euo pipefail",
+        "RUN git clone \"$REPO_URL\" /workspace/repo \\",
+        "  && git -C /workspace/repo fetch --all --tags || true \\",
+        "  && git -C /workspace/repo checkout \"$REPO_COMMIT\"",
         "",
-        "ROOT=\"$(cd \"$(dirname \"$0\")/..\" && pwd)\"",
-        "REPO_DIR=\"$ROOT/repo\"",
-        f"REPO_URL={json.dumps(meta.repo_url)}",
-        f"REPO_COMMIT={json.dumps(meta.repo_commit)}",
-        "",
-        "mkdir -p \"$REPO_DIR\"",
-        "if [ ! -d \"$REPO_DIR/.git\" ]; then",
-        "  git clone \"$REPO_URL\" \"$REPO_DIR\"",
+        "# Heuristic dependency setup is baked into the image build.",
+        "RUN if [ -f /workspace/repo/requirements.txt ]; then \\",
+        "    python3 -m pip install -r /workspace/repo/requirements.txt; \\",
+        "  fi",
+        "RUN if [ -f /workspace/repo/pyproject.toml ]; then \\",
+        "    python3 -m pip install -e /workspace/repo; \\",
+        "  fi",
+        "RUN if [ -f /workspace/repo/package.json ]; then \\",
+        "    cd /workspace/repo && npm install; \\",
         "fi",
-        "git -C \"$REPO_DIR\" fetch --all --tags || true",
-        "git -C \"$REPO_DIR\" checkout \"$REPO_COMMIT\"",
-        "",
-        "# Heuristic dependency setup",
-        "if [ -f \"$REPO_DIR/requirements.txt\" ]; then",
-        "  python3 -m pip install -r \"$REPO_DIR/requirements.txt\" || true",
+        "RUN if [ -f /workspace/repo/go.mod ]; then \\",
+        "    cd /workspace/repo && go mod download; \\",
         "fi",
-        "if [ -f \"$REPO_DIR/pyproject.toml\" ]; then",
-        "  python3 -m pip install -e \"$REPO_DIR\" || true",
-        "fi",
-        "if [ -f \"$REPO_DIR/package.json\" ]; then",
-        "  (cd \"$REPO_DIR\" && npm install) || true",
-        "fi",
-        "if [ -f \"$REPO_DIR/go.mod\" ]; then",
-        "  (cd \"$REPO_DIR\" && go mod download) || true",
-        "fi",
-        "if [ -f \"$REPO_DIR/Cargo.toml\" ]; then",
-        "  (cd \"$REPO_DIR\" && cargo fetch) || true",
+        "RUN if [ -f /workspace/repo/Cargo.toml ]; then \\",
+        "    cd /workspace/repo && cargo fetch; \\",
         "fi",
         "",
-        "echo \"setup complete\"",
-        "",
+        "WORKDIR /workspace/repo",
     ])
 
 
@@ -700,7 +683,9 @@ def render_phase1_py(meta: RepoMeta) -> str:
         "import subprocess",
         "",
         "ROOT = Path(__file__).resolve().parent.parent",
+        "DOCKERFILE = ROOT / 'environment' / 'Dockerfile'",
         "REPO = ROOT / 'repo'",
+        f"REPO_URL = {json.dumps(meta.repo_url)}",
         f"EXPECTED_COMMIT = {json.dumps(meta.repo_commit)}",
         "",
         "",
@@ -708,13 +693,25 @@ def render_phase1_py(meta: RepoMeta) -> str:
         "    return subprocess.run(cmd, cwd=cwd, check=True, capture_output=True, text=True).stdout.strip()",
         "",
         "",
-        "def test_setup_script_exists_and_runs():",
-        "    setup = ROOT / 'environment' / 'setup.sh'",
-        "    assert setup.exists()",
-        "    subprocess.run(['bash', str(setup)], check=True)",
+        "def ensure_repo_materialized():",
+        "    if (REPO / '.git').exists():",
+        "        return",
+        "    subprocess.run(['git', 'clone', REPO_URL, str(REPO)], check=True)",
+        "    subprocess.run(['git', '-C', str(REPO), 'fetch', '--all', '--tags'], check=True)",
+        "    subprocess.run(['git', '-C', str(REPO), 'checkout', EXPECTED_COMMIT], check=True)",
+        "",
+        "",
+        "def test_dockerfile_exists_and_encodes_repo_setup():",
+        "    assert DOCKERFILE.exists()",
+        "    text = DOCKERFILE.read_text(encoding='utf-8')",
+        "    assert REPO_URL in text",
+        "    assert EXPECTED_COMMIT in text",
+        "    assert 'git clone' in text",
+        "    assert 'git -C /workspace/repo checkout' in text",
         "",
         "",
         "def test_repo_commit_is_fixed_version():",
+        "    ensure_repo_materialized()",
         "    commit = run(['git', '-C', str(REPO), 'rev-parse', 'HEAD'])",
         "    assert commit == EXPECTED_COMMIT",
         "",
@@ -736,6 +733,9 @@ def render_phase2_py() -> str:
         "",
         "",
         "def test_reference_solution_and_behavior_contract():",
+        "    REPO.mkdir(parents=True, exist_ok=True)",
+        "    if not (REPO / '.git').exists():",
+        "        raise AssertionError('Repo not prepared; phase1 must run before phase2')",
         "    subprocess.run(['bash', str(ROOT / 'solution' / 'solve.sh')], check=True)",
         "    contract = json.loads((ROOT / 'solution' / 'behavior_contract.json').read_text(encoding='utf-8'))",
         "    artifact = REPO / contract['artifact_file']",
@@ -767,8 +767,7 @@ def write_task_bundle(root: Path, meta: RepoMeta, understanding: Understanding, 
     write_file(task_dir / "instruction.md", render_instruction(meta, understanding, cap_map, task))
     write_file(task_dir / "task.toml", render_task_toml(meta, task))
 
-    write_file(task_dir / "environment" / "Dockerfile", render_dockerfile())
-    write_file(task_dir / "environment" / "setup.sh", render_setup_sh(meta), executable=True)
+    write_file(task_dir / "environment" / "Dockerfile", render_dockerfile(meta))
 
     write_file(task_dir / "solution" / "solve.sh", render_solution_sh(task), executable=True)
     write_file(task_dir / "solution" / "solution.md", render_solution_md(task))

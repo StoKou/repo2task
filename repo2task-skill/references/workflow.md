@@ -90,6 +90,7 @@ task_xxx/
 ├── instruction.md
 ├── task.toml
 ├── environment/
+│   └── Dockerfile
 ├── solution/
 └── test/
 ```
@@ -99,3 +100,5 @@ Quality bar:
 - deterministic tests
 - behavior-based assertions (avoid implementation coupling)
 - no synthetic fallback tasks when mined candidates are weak
+- all repository import/setup/install logic must be encoded in `environment/Dockerfile`
+- do not depend on `environment/setup.sh`

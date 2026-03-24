@@ -15,7 +15,7 @@
 `repo2task` 会先理解仓库文档与 examples，再优先挖掘 GitHub 上真实的 `PR/issue` 作为任务来源，并将通过筛选的候选重写成 benchmark 风格任务目录：
 - `instruction.md`（问题定义）
 - `task.toml`（任务元信息）
-- `environment/`（Docker 与配置）
+- `environment/`（仅 `Dockerfile`）
 - `solution/`（解题脚本与说明）
 - `test/`（校验脚本）
 
@@ -24,6 +24,7 @@
 - 每个 GitHub 仓库最多生成 `3` 个任务
 - 如果没有足够好的候选，就少生成或跳过，不回填宽泛任务
 - 使用 subagent 对候选进行摘要、筛选和格式重写
+- `environment/` 仅保留 `Dockerfile`，仓库导入和安装逻辑都写入镜像构建流程
 
 ## ⚡ 快速开始
 
@@ -67,3 +68,4 @@ cp -R ./repo2task-skill ~/.config/opencode/skills/repo2task
 - [QUICKSTART.md](/mnt/d/2026/skillsfolder/code/repo2task/QUICKSTART.md)
 - [EXAMPLES.md](/mnt/d/2026/skillsfolder/code/repo2task/EXAMPLES.md)
 - [docs/OUTPUT_SPEC.md](/mnt/d/2026/skillsfolder/code/repo2task/docs/OUTPUT_SPEC.md)
+- `repo2task-skill/references/skillsbench-sanity/hello-world/`（环境与结构参考）

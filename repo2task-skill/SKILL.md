@@ -100,6 +100,7 @@ task_xxx/
 ├── instruction.md
 ├── task.toml
 ├── environment/
+│   └── Dockerfile
 ├── solution/
 └── test/
 ```
@@ -136,12 +137,13 @@ Must include:
 ### `environment/`
 Must include:
 - `Dockerfile`
-- `setup.sh`
 
-`setup.sh` must support:
-- checkout to fixed commit
+`Dockerfile` must support:
+- repository import or checkout to the fixed commit
 - dependency installation
 - minimal runnable baseline state
+- any setup previously done by shell scripts must be expressed through Docker build steps or the container command/entrypoint
+- do not rely on a separate `setup.sh`
 
 ### `solution/`
 Reference implementation must:
@@ -173,6 +175,17 @@ python3 scripts/generate_repo2task.py build-from-json --repos-json <repos.json> 
 - If repository docs are weak, explicitly declare mode switch to code-driven inference.
 - Reuse cached GitHub metadata before making new issue/PR requests.
 - Do not fabricate tasks when the repository lacks high-quality PR/issue candidates.
+- Prefer the `skillsbench` task shape where `environment/` contains only a `Dockerfile`.
+
+## Reference Benchmark
+
+For concrete packaging expectations, refer to:
+- `references/skillsbench-sanity/hello-world/`
+
+This reference shows the preferred environment shape:
+- `environment/` contains only `Dockerfile`
+- task execution and verification are separated from environment construction
+- task metadata and tests follow a benchmark-style layout
 
 ## References
 

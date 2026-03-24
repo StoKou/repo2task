@@ -7,8 +7,7 @@
 ├── instruction.md
 ├── task.toml
 ├── environment/
-│   ├── Dockerfile
-│   └── setup.sh
+│   └── Dockerfile
 ├── solution/
 │   ├── solve.sh
 │   ├── solution.md
@@ -58,15 +57,14 @@
 - `rewrite_agent`
 - `rewrite_strategy`
 - `feasibility_score`
-- 环境引用：`environment_dockerfile`、`environment_setup`
+- 环境引用：`environment_dockerfile`
 - 测试引用：`phase1_test`、`phase2_test`
 
 ## environment/
 
 用途：定义可复现环境构建与仓库初始化。
 
-- `Dockerfile`: 基础运行环境
-- `setup.sh`: 拉取仓库并切换到固定 commit，安装依赖并建立 baseline 可运行状态
+- `Dockerfile`: 基础运行环境，必须负责仓库导入、固定 commit 对齐、依赖安装和 baseline 可运行状态准备
 
 ## solution/
 

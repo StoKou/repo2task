@@ -28,7 +28,6 @@ baseline_command = ""
 
 # environment setup references
 environment_dockerfile = "environment/Dockerfile"
-environment_setup = "environment/setup.sh"
 
 # test references
 phase1_test = "test/phase1_install_check.py"

@@ -28,7 +28,6 @@ filter_reasons = ["high-specificity", "clear-file-locality", "testable"]
 
 # environment setup references
 environment_dockerfile = "environment/Dockerfile"
-environment_setup = "environment/setup.sh"
 baseline_command = "python3 -m pytest -q"
 
 # test references
@@ -62,8 +61,8 @@ Rules:
 ### Phase 1: Installation verification
 
 Must verify:
-- fixed commit checkout
-- environment setup command success
+- fixed commit checkout or equivalent repository import into the image
+- Docker environment builds successfully
 - baseline runnable state
 
 ### Phase 2: Task verification
