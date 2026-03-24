@@ -3,3 +3,7 @@ __pycache__/
 .pytest_cache/
 output/
 demo-output/
+generated/
+generated-bench/
+generated-local/
+generated-batch/
