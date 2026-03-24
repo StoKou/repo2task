@@ -1,56 +1,61 @@
 ---
 name: repo2task
-description: Analyze a GitHub repository's examples/docs and generate secondary-development requirement docs, implementation tasks, and per-task pytest scaffolds for feature extension, dependency swapping, and feature aggregation.
+description: Clone/download a GitHub repository, analyze examples/docs/readme, and generate complex secondary-development tasks where each requirement is a separate subtopic folder with instruction.md and test Python files.
 ---
 
 # Repo2Task Skill
 
-Use this skill when the user wants to transform an existing GitHub repository into actionable secondary-development work items.
+Use this skill to convert an existing GitHub repo into secondary-development tasks.
 
-## Goal
+## Mandatory Pipeline
 
-Produce a practical task package from an existing repository:
+1. Resolve source repository:
+- Accept local path, GitHub URL, or `owner/repo`.
+- If remote, perform shallow clone first (`git clone --depth 1`).
 
-1. Read `examples/` or `docs/` first; fallback to root `README*`.
-2. Generate requirement docs for secondary development.
-3. Convert each requirement into an implementation task.
-4. Generate one test file per task.
+2. Read knowledge sources in this order:
+- `examples/` or `example/`
+- `docs/` or `doc/`
+- root `README*`
 
-## Supported Secondary-Development Modes
+3. Build concept-driven requirements:
+- Each requirement must begin with concept understanding.
+- Requirement content must be non-trivial (compatibility, rollback, observability, risk).
 
-- New feature extension: add capabilities around existing modules.
-- Dependency swap (`掉包`): replace internal/third-party components while preserving external behavior.
-- Feature aggregation: combine multiple existing capabilities into one workflow/API.
+4. Generate output with fixed structure:
+- `<out>/<gitname>/<subtopic>/instruction.md`
+- `<out>/<gitname>/<subtopic>/test/test1.py`
+- `<out>/<gitname>/<subtopic>/test/test2.py`
 
-## Workflow
+## Command
 
-1. Collect source context:
-- Prefer `examples/`, `example/`, `docs/`.
-- Include root `README.md` if available.
-
-2. Generate artifacts with script:
-- Run:
 ```bash
-python3 scripts/generate_repo2task.py build --repo <repo-path-or-url> --out <output-dir>
+python3 scripts/generate_repo2task.py build --repo <path|url|owner/repo> --out <output-dir>
 ```
-- Default output files:
-  - `requirements.md`
-  - `tasks.md`
-  - `tests/test_txxx.py`
 
-3. Review and refine:
-- Ensure each requirement is scoped to secondary development, not greenfield rewrite.
-- Ensure each task has acceptance criteria and test intent.
+Or from repository list json:
 
-## Output Rules
+```bash
+python3 scripts/generate_repo2task.py build-from-json \
+  --repos-json <repos.json> \
+  --index 0 \
+  --out <output-dir>
+```
 
-- Keep requirements and tasks in Markdown (`.md`).
-- Each task must map to at least one generated test file.
-- Prefer concrete module-level statements (API endpoint, class, CLI command, workflow).
+## Output Quality Rules
+
+- One `subtopic` directory = one requirement.
+- `instruction.md` must include:
+  - 概念理解
+  - 需求说明
+  - 实施方案
+  - 验收标准
+  - 风险与约束
+- Each `subtopic` must include test code under `test/`.
 
 ## References
 
-- Process details: `references/workflow.md`
-- Task schema: `references/task-schema.md`
-- Requirement template: `assets/requirement_template.md`
-- Task template: `assets/task_template.md`
+- `references/workflow.md`
+- `references/task-schema.md`
+- `assets/requirement_template.md`
+- `assets/task_template.md`

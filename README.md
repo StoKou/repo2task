@@ -1,16 +1,34 @@
 # repo2task
 
-`repo2task` 是一个用于 **GitHub 仓库二次开发任务生成** 的 Skill 工程。
+`repo2task` 是一个用于 GitHub 仓库二次开发任务生成的 Skill 工程。
 
-它会优先读取目标仓库中的 `example(s)`、`docs`、`README`，自动生成：
-- 需求文档（`requirements.md`）
-- 任务清单（`tasks.md`）
-- 每个任务对应的 `pytest` 测试文件（`tests/test_txxx.py`）
+它支持先自动 `git clone`（或使用本地仓库），再基于文档理解生成复杂任务包。
 
-支持三类二次开发场景：
-- 新增功能
-- 依赖替换（掉包）
-- 功能聚合
+## 生成目标
+
+每个需求是一个独立子目录，固定输出结构：
+
+```text
+<output>/<gitname>/
+├── <subtopic-1>/
+│   ├── instruction.md
+│   └── test/
+│       ├── test1.py
+│       └── test2.py
+├── <subtopic-2>/
+│   ├── instruction.md
+│   └── test/
+│       ├── test1.py
+│       └── test2.py
+└── ...
+```
+
+其中 `instruction.md` 包含：
+- 概念理解
+- 需求说明
+- 实施方案
+- 验收标准
+- 风险与约束
 
 ## 仓库结构
 
@@ -29,9 +47,7 @@ repo2task/
         └── task_template.md
 ```
 
-## 在 CLI 中快速导入 Skill
-
-> 以下示例基于 Codex CLI 的本地技能目录约定：`$CODEX_HOME/skills`。
+## CLI 快速导入 Skill
 
 ```bash
 export CODEX_HOME="${CODEX_HOME:-$HOME/.codex}"
@@ -39,44 +55,29 @@ mkdir -p "$CODEX_HOME/skills"
 cp -R ./repo2task-skill "$CODEX_HOME/skills/repo2task"
 ```
 
-导入后，可在对话中直接使用：
+## 用法
 
-```text
-请使用 repo2task skill，基于 <repo-path-or-url> 生成二次开发需求和任务。
-```
-
-## 直接用脚本生成任务
+1) 从单个仓库生成：
 
 ```bash
 python3 repo2task-skill/scripts/generate_repo2task.py \
   build \
-  --repo <本地仓库路径或GitHub URL> \
-  --out ./output
+  --repo junegunn/fzf \
+  --out ./generated
 ```
 
-生成结果：
-
-```text
-output/
-├── requirements.md
-├── tasks.md
-└── tests/
-    ├── test_t001.py
-    ├── test_t002.py
-    └── ...
-```
-
-## 示例
+2) 从 `repos.json` 按索引生成（例如第一个项目）：
 
 ```bash
 python3 repo2task-skill/scripts/generate_repo2task.py \
-  build \
-  --repo ../repo2skill \
-  --out ./demo-output
+  build-from-json \
+  --repos-json /mnt/d/2026/skillsfolder/code/data/reposkills/repos.json \
+  --index 0 \
+  --out ./generated
 ```
 
-然后在目标工程内实现任务，并运行：
+## 在对话中使用 Skill
 
-```bash
-pytest
+```text
+请使用 repo2task skill，对 junegunn/fzf 生成二次开发任务包，并按 gitname/subtopic 输出。
 ```
