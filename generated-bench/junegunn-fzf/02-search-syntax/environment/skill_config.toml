@@ -1,0 +1,10 @@
+[skill]
+name = "repo2task"
+repo = "junegunn/fzf"
+subtopic = "02-search-syntax"
+dev_mode = "依赖替换（掉包）"
+
+[io]
+input_dir = "/app/input"
+output_dir = "/app/output"
+workspace = "/app"

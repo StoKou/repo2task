@@ -1,0 +1,10 @@
+[skill]
+name = "repo2task"
+repo = "junegunn/fzf"
+subtopic = "04-customizing-the-look"
+dev_mode = "新增功能"
+
+[io]
+input_dir = "/app/input"
+output_dir = "/app/output"
+workspace = "/app"

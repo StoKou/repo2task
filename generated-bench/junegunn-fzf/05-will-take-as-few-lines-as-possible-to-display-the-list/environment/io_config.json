@@ -1,0 +1,14 @@
+{
+  "repo": "junegunn/fzf",
+  "subtopic": "05-will-take-as-few-lines-as-possible-to-display-the-list",
+  "expected_inputs": [
+    "source repository",
+    "docs/examples/readme context",
+    "existing module contracts"
+  ],
+  "expected_outputs": [
+    "code changes",
+    "updated docs",
+    "passing tests"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "repo": "junegunn/fzf",
+  "subtopic": "03-setting-up-shell-integration",
+  "expected_inputs": [
+    "source repository",
+    "docs/examples/readme context",
+    "existing module contracts"
+  ],
+  "expected_outputs": [
+    "code changes",
+    "updated docs",
+    "passing tests"
+  ]
+}

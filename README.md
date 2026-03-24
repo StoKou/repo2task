@@ -12,23 +12,32 @@
 <output>/<gitname>/
 ├── <subtopic-1>/
 │   ├── instruction.md
+│   ├── task.toml
+│   ├── environment/
+│   │   ├── Dockerfile
+│   │   ├── skill_config.toml
+│   │   └── io_config.json
+│   ├── solution/
+│   │   ├── solve.sh
+│   │   └── solution.md
 │   └── test/
-│       ├── test1.py
-│       └── test2.py
+│       ├── test.sh
+│       └── test_state.py
 ├── <subtopic-2>/
 │   ├── instruction.md
+│   ├── task.toml
+│   ├── environment/
+│   ├── solution/
 │   └── test/
-│       ├── test1.py
-│       └── test2.py
 └── ...
 ```
 
-其中 `instruction.md` 包含：
-- 概念理解
-- 需求说明
-- 实施方案
-- 验收标准
-- 风险与约束
+含义：
+- `instruction.md`：问题定义与目标约束
+- `task.toml`：任务元信息和资源参数
+- `environment/`：Docker 与 skill/io 初始配置
+- `solution/`：解决命令、代码说明和执行指引
+- `test/`：任务校验脚本
 
 ## 仓库结构
 
