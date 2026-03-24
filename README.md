@@ -90,3 +90,4 @@ python3 repo2task-skill/scripts/generate_repo2task.py \
 ```text
 请使用 repo2task skill，对 junegunn/fzf 生成二次开发任务包，并按 gitname/subtopic 输出。
 ```
+# repo2task
